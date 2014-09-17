@@ -5,9 +5,7 @@ class Float
 end
 
 class Simulation
-  attr_reader :principle, :yearly_contribution, :apr, :inflation_rate, :years
-
-  def initialize(principle, yearly_contribution, apr, inflation_rate, age_now, age_retirement, age_death)
+  def initialize(principle, yearly_contribution, apr, inflation_rate, age_now, age_retirement, age_death, yearly_distribution)
     @principle = principle
     @yearly_contribution = yearly_contribution
     @apr = apr
@@ -15,19 +13,20 @@ class Simulation
     @age_now = age_now
     @age_retirement = age_retirement
     @age_death = age_death
+    @yearly_distribution = yearly_distribution
   end
 
   def run
     @value_at_end_of_year = {}
     # Fill in values for accumulation years
-    @value_at_end_of_year[@age_now] = Year.new(principle, yearly_contribution, apr, inflation_rate).after_inflation
+    @value_at_end_of_year[@age_now] = Year.new(@principle, @yearly_contribution, @apr, @inflation_rate).after_inflation
     (@age_now+1..@age_retirement).each do |x|
-      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], yearly_contribution, apr, inflation_rate).after_inflation
+      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], @yearly_contribution, @apr, @inflation_rate).after_inflation
     end
 
     # Fill in values for distribution years
     (@age_retirement+1..@age_death).each do |x|
-      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], 0, apr, inflation_rate).after_inflation
+      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], 0, @apr, @inflation_rate).after_inflation
     end
   end
 
@@ -37,8 +36,6 @@ class Simulation
 end
 
 class Year
-  attr_reader :base_value, :yearly_contribution, :apr, :inflation_rate
-
   def initialize(base_value, yearly_contribution, apr, inflation_rate)
     @base_value = base_value
     @yearly_contribution = yearly_contribution
@@ -47,17 +44,15 @@ class Year
   end
 
   def before_inflation
-    base_value * (1 + apr) + Contributions.new(yearly_contribution, apr).total
+    @base_value * (1 + @apr) + Contributions.new(@yearly_contribution, @apr).total
   end
 
   def after_inflation
-    self.before_inflation / (1 + inflation_rate)
+    self.before_inflation / (1 + @inflation_rate)
   end
 end
 
 class Contributions
-  attr_reader :interest_earned_from_each_contribution
-
   def initialize(yearly_contribution, apr)
     @yearly_contribution = yearly_contribution
     @monthly_contribution = yearly_contribution/12
@@ -72,6 +67,14 @@ class Contributions
     @interest_earned_from_each_contribution.values.inject(:+) + @yearly_contribution
   end
 end
+
+# Class Distributions
+#   def initialize(yearly_distribution)
+#     @yearly_distribution = yearly_distribution
+#   end
+
+
+# end
 
 # class Compare
 #   def initialize(principle, yearly_contribution)
@@ -98,7 +101,7 @@ end
 
 # Compare.new(40000, 20000).go(30)
 
-s1 = Simulation.new(40000, 20000, 0.06, 0.02, 36, 65, 95)
+s1 = Simulation.new(40000, 20000, 0.06, 0.02, 36, 65, 95, 60000)
 s1.run
 p s1.data.map{|d| d.pretty}.join(', ')
 
