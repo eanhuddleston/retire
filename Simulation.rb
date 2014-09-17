@@ -7,21 +7,28 @@ end
 class Simulation
   attr_reader :principle, :yearly_contribution, :apr, :inflation_rate, :years
 
-  def initialize(principle, yearly_contribution, apr, inflation_rate, years)
+  def initialize(principle, yearly_contribution, apr, inflation_rate, age_now, age_retirement, age_death)
     @principle = principle
     @yearly_contribution = yearly_contribution
     @apr = apr
     @inflation_rate = inflation_rate
-    @years = years
+    @age_now = age_now
+    @age_retirement = age_retirement
+    @age_death = age_death
   end
 
   def run
     @value_at_end_of_year = {}
-    @value_at_end_of_year[1] = Year.new(principle, yearly_contribution, apr, inflation_rate).after_inflation
-    years > 1 and (2..years).each do |x|
+    # Fill in values for accumulation years
+    @value_at_end_of_year[@age_now] = Year.new(principle, yearly_contribution, apr, inflation_rate).after_inflation
+    (@age_now+1..@age_retirement).each do |x|
       @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], yearly_contribution, apr, inflation_rate).after_inflation
     end
-    @value_at_end_of_year[years]
+
+    # Fill in values for distribution years
+    (@age_retirement+1..@age_death).each do |x|
+      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], 0, apr, inflation_rate).after_inflation
+    end
   end
 
   def data
@@ -91,7 +98,7 @@ end
 
 # Compare.new(40000, 20000).go(30)
 
-s1 = Simulation.new(40000, 20000, 0.06, 0.02, 30)
+s1 = Simulation.new(40000, 20000, 0.06, 0.02, 36, 65, 95)
 s1.run
 p s1.data.map{|d| d.pretty}.join(', ')
 
