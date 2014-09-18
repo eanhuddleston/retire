@@ -5,33 +5,40 @@ class Float
 end
 
 class Simulation
-  def initialize(principle, yearly_contribution, apr, inflation_rate, age_now, age_retirement, age_death, yearly_distribution)
+  def initialize(principle, yearly_contribution, yearly_distribution, apr, inflation_rate, age_now, age_retirement, age_death)
+    unless age_now < age_retirement and age_retirement < age_death
+      raise RuntimeError.new 'Get your ages straight, man'
+    end
     @principle = principle
     @yearly_contribution = yearly_contribution
+    @yearly_distribution = yearly_distribution
     @apr = apr
     @inflation_rate = inflation_rate
     @age_now = age_now
     @age_retirement = age_retirement
     @age_death = age_death
-    @yearly_distribution = yearly_distribution
   end
 
   def run
     @value_at_end_of_year = {}
+    @value_at_end_of_year[@age_now] = @principle.to_f
     # Fill in values for accumulation years
-    @value_at_end_of_year[@age_now] = Year.new(@principle, @yearly_contribution, @apr, @inflation_rate).after_inflation
     (@age_now+1..@age_retirement).each do |x|
-      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], @yearly_contribution, @apr, @inflation_rate).after_inflation
+      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], @yearly_contribution, 0, @apr, @inflation_rate).after_inflation
     end
 
     # Fill in values for distribution years
     (@age_retirement+1..@age_death).each do |x|
-      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], 0, @apr, @inflation_rate).after_inflation
+      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], 0, @yearly_distribution, @apr, @inflation_rate).after_inflation
     end
   end
 
   def data
-    @value_at_end_of_year.values
+    @value_at_end_of_year
+  end
+
+  def last
+    @value_at_end_of_year.values.last
   end
 end
 
@@ -46,7 +53,8 @@ class Year
 
   def before_inflation
     if @yearly_contribution > 0 # in contribution phase
-      @base_value * (1 + @apr) + Contributions.new(@yearly_contribution, @apr).total
+      contribution_interest = InterestEarnedOnContribution.new(@yearly_contribution, @apr).total
+      @base_value * (1 + @apr) + @yearly_contribution + contribution_interest
     elsif @yearly_distribution > 0 # in distribution phase
       value_of_base_minus_distribution_plus_interest = ( @base_value - @yearly_distribution ) * (1 + @apr)
       distribution_interest = InterestEarnedOnDistribution.new(@yearly_distribution, @apr).total
@@ -90,7 +98,8 @@ class InterestEarnedOnDistribution
   end
 end
 
-class Contributions
+
+class InterestEarnedOnContribution
   def initialize(yearly_contribution, apr)
     @yearly_contribution = yearly_contribution
     @monthly_contribution = yearly_contribution/12
@@ -102,23 +111,30 @@ class Contributions
     (1..12).each do |x|
       @interest_earned_from_each_contribution[x] = @monthly_contribution * @apr * ((12 - x) / 12.0)
     end
-    @interest_earned_from_each_contribution.values.inject(:+) + @yearly_contribution
+    @interest_earned_from_each_contribution.values.inject(:+)
   end
 end
 
-d = InterestEarnedOnDistribution.new(60000, 0.06)
-puts d.total
 
 
-y = Year.new(60000, 0, 60000, 0.06, 0.03)
-puts y.before_inflation
+# d = InterestEarnedOnDistribution.new(60000, 0.06)
+# puts d.total
 
+# y = Year.new(60000, 0, 60000, 0.06, 0.03)
+# puts y.after_inflation
 
+s1 = Simulation.new(0, 10, 12, 0.06, 0.0325, 36, 65, 95)
+s1.run
+# puts s1.data.map{|y, v| "#{y}:#{v.pretty}"}.join(', ')
 
-# s1 = Simulation.new(40000, 20000, 0.06, 0.02, 36, 65, 95, 60000)
-# s1.run
-# p s1.data.map{|d| d.pretty}.join(', ')
+s1.data.each{|y, v| puts "#{y}: #{v.pretty}"}
 
+# x = 0.01
+# 400.times{
+#   s = Simulation.new(0, 10, 12, x, 0.0325, 36, 65, 95)
+#   s.run
+#   x += 0.001
+# }
 
 # Compare.new(40000, 20000).go(30)
 
