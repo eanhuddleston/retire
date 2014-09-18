@@ -102,7 +102,7 @@ end
 class InterestEarnedOnContribution
   def initialize(yearly_contribution, apr)
     @yearly_contribution = yearly_contribution
-    @monthly_contribution = yearly_contribution/12
+    @monthly_contribution = yearly_contribution/12.0
     @apr = apr
   end
 
@@ -112,6 +112,10 @@ class InterestEarnedOnContribution
       @interest_earned_from_each_contribution[x] = @monthly_contribution * @apr * ((12 - x) / 12.0)
     end
     @interest_earned_from_each_contribution.values.inject(:+)
+  end
+
+  def data
+    @interest_earned_from_each_contribution
   end
 end
 
@@ -123,11 +127,16 @@ end
 # y = Year.new(60000, 0, 60000, 0.06, 0.03)
 # puts y.after_inflation
 
-s1 = Simulation.new(0, 10, 12, 0.06, 0.0325, 36, 65, 95)
+# puts Year.new(0.0, 10, 0, 0.1, 0).after_inflation
+# i =  InterestEarnedOnContribution.new(10, 0.1)
+# i.total
+# p i.data
+
+s1 = Simulation.new(0, 10, 20, 0.1, 0, 20, 30, 40)
 s1.run
 # puts s1.data.map{|y, v| "#{y}:#{v.pretty}"}.join(', ')
 
-s1.data.each{|y, v| puts "#{y}: #{v.pretty}"}
+s1.data.each{|y, v| puts "#{y}: #{v}"}
 
 # x = 0.01
 # 400.times{
