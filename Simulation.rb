@@ -36,19 +36,57 @@ class Simulation
 end
 
 class Year
-  def initialize(base_value, yearly_contribution, apr, inflation_rate)
+  def initialize(base_value, yearly_contribution, yearly_distribution, apr, inflation_rate)
     @base_value = base_value
     @yearly_contribution = yearly_contribution
+    @yearly_distribution = yearly_distribution
     @apr = apr
     @inflation_rate = inflation_rate
   end
 
   def before_inflation
-    @base_value * (1 + @apr) + Contributions.new(@yearly_contribution, @apr).total
+    if @yearly_contribution > 0 # in contribution phase
+      @base_value * (1 + @apr) + Contributions.new(@yearly_contribution, @apr).total
+    elsif @yearly_distribution > 0 # in distribution phase
+      value_of_base_minus_distribution_plus_interest = ( @base_value - @yearly_distribution ) * (1 + @apr)
+      distribution_interest = InterestEarnedOnDistribution.new(@yearly_distribution, @apr).total
+      value_of_base_minus_distribution_plus_interest + distribution_interest
+    end
   end
 
   def after_inflation
     self.before_inflation / (1 + @inflation_rate)
+  end
+end
+
+##
+# The entire yearly distribution isn't taken out all once, so the amount of it
+# that's left each month still earns interest. For example, if the yearly distribution
+# is 60k, then at the beginning of January, 5k will be taken out. But 55k of the 
+# distribution will still earn interest for the month of Jan. This class calculates,
+# for each month in the year, how much of the 60k is left and how much interest it
+# earns, then returns the sum of all the interest earned (on the distribution amount).
+#
+class InterestEarnedOnDistribution
+  def initialize(yearly_distribution, apr)
+    @yearly_distribution = yearly_distribution
+    @monthly_distribution = yearly_distribution/12
+    @monthly_apr = apr/12
+  end
+
+  def total
+    @interest_earned_during_each_month = {}
+    amount_of_distribution_remaining = @yearly_distribution
+    
+    (1..12).each do |x|
+      # Subtract monthly distribution at beginning of month
+      amount_of_distribution_remaining -= @monthly_distribution
+      # Calculate how much interest was earned during month by remainder
+      @interest_earned_during_each_month[x] = amount_of_distribution_remaining * @monthly_apr
+    end
+
+    # Return the total interest earned on the remaining parts of distribution throughout year
+    @interest_earned_during_each_month.values.inject(:+)
   end
 end
 
@@ -68,10 +106,31 @@ class Contributions
   end
 end
 
-# Class Distributions
-#   def initialize(yearly_distribution)
-#     @yearly_distribution = yearly_distribution
-#   end
+d = InterestEarnedOnDistribution.new(60000, 0.06)
+puts d.total
+
+
+y = Year.new(60000, 0, 60000, 0.06, 0.03)
+puts y.before_inflation
+
+
+
+# s1 = Simulation.new(40000, 20000, 0.06, 0.02, 36, 65, 95, 60000)
+# s1.run
+# p s1.data.map{|d| d.pretty}.join(', ')
+
+
+# Compare.new(40000, 20000).go(30)
+
+# puts Simulation.new(40000, 20000, 0.08, 0.03, 30).simulate.pretty
+# c = Simulation.new(40000, 20000, 0.06, 0.04, 30)
+# puts c.simulate
+
+# y = Year.new(40000, 0, 0.06, 0.02)
+# puts y.after_inflation
+
+# t = Contributions.new(1200, 0.06)
+# puts t.total
 
 
 # end
@@ -97,24 +156,4 @@ end
 #     puts "Best case: #{ best.pretty }"
 #   end
 # end
-
-
-# Compare.new(40000, 20000).go(30)
-
-s1 = Simulation.new(40000, 20000, 0.06, 0.02, 36, 65, 95, 60000)
-s1.run
-p s1.data.map{|d| d.pretty}.join(', ')
-
-
-
-# puts Simulation.new(40000, 20000, 0.08, 0.03, 30).simulate.pretty
-# c = Simulation.new(40000, 20000, 0.06, 0.04, 30)
-# puts c.simulate
-
-# y = Year.new(40000, 0, 0.06, 0.02)
-# puts y.after_inflation
-
-# t = Contributions.new(1200, 0.06)
-# puts t.total
-
 
