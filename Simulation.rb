@@ -5,8 +5,15 @@ class Float
 end
 
 class Simulation
-  def initialize(principle, yearly_contribution, yearly_distribution, apr, inflation_rate, age_now, age_retirement, age_death)
-    unless age_now < age_retirement and age_retirement < age_death
+  def initialize(principle: 40000,
+        yearly_contribution: 20000, 
+        yearly_distribution: 60000, 
+        apr: 0.06, 
+        inflation_rate: 0.0325, 
+        age_now: 35, 
+        age_retire: 65, 
+        age_die: 95)
+    unless age_now < age_retire and age_retire < age_die
       raise RuntimeError.new 'Get your ages straight, man'
     end
     @principle = principle
@@ -15,20 +22,20 @@ class Simulation
     @apr = apr
     @inflation_rate = inflation_rate
     @age_now = age_now
-    @age_retirement = age_retirement
-    @age_death = age_death
+    @age_retire = age_retire
+    @age_die = age_die
   end
 
   def run
     @value_at_end_of_year = {}
     @value_at_end_of_year[@age_now] = @principle.to_f
     # Fill in values for accumulation years
-    (@age_now+1..@age_retirement).each do |x|
+    (@age_now+1..@age_retire).each do |x|
       @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], @yearly_contribution, 0, @apr, @inflation_rate).after_inflation
     end
 
     # Fill in values for distribution years
-    (@age_retirement+1..@age_death).each do |x|
+    (@age_retire+1..@age_die).each do |x|
       @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], 0, @yearly_distribution, @apr, @inflation_rate).after_inflation
     end
   end
@@ -132,7 +139,14 @@ end
 # i.total
 # p i.data
 
-s1 = Simulation.new(0, 10, 20, 0.1, 0, 20, 30, 40)
+s1 = Simulation.new(principle: 0,
+    yearly_contribution: 10,
+    yearly_distribution: 20,
+    apr: 0,
+    inflation_rate: 0,
+    age_now: 20,
+    age_retire: 21,
+    age_die: 22)
 s1.run
 # puts s1.data.map{|y, v| "#{y}:#{v.pretty}"}.join(', ')
 
