@@ -10,11 +10,11 @@ class Simulation
         yearly_distribution: 60000,
         distribution_tax_rate: 0.25,
         monthly_ss: 2000,
-        social_security: 2000, 
-        apr: 0.06, 
-        inflation_rate: 0.0325, 
-        age_now: 35, 
-        age_retire: 65, 
+        social_security: 2000,
+        apr: 0.06,
+        inflation_rate: 0.0325,
+        age_now: 35,
+        age_retire: 65,
         age_die: 95)
     unless age_now < age_retire and age_retire < age_die
       raise RuntimeError.new 'Get your ages straight, man'
@@ -77,9 +77,12 @@ class Year
     elsif @yearly_distribution > 0 # in distribution phase
       monthly_ss_after_taxes = @monthly_ss * (1 - @distribution_tax_rate)
       yearly_ss_after_taxes = monthly_ss_after_taxes * 12
-      yearly_distribution_after_ss_correction = @yearly_distribution - yearly_ss_after_taxes
-      value_of_base_minus_distribution_plus_interest = ( @base_value - yearly_distribution_after_ss_correction ) * (1 + @apr)
-      distribution_interest = InterestEarnedOnDistribution.new(yearly_distribution_after_ss_correction, @apr).total
+      # Don't need to take out full amount needed, as some provided by SS
+      yearly_distribution_minus_ss_contribution = @yearly_distribution - yearly_ss_after_taxes
+      # But, of that needed after SS, need to take out enough to pay for taxes (and still have desired amount left)
+      yearly_distribution_after_tax_correction = yearly_distribution_minus_ss_contribution / (1 - @distribution_tax_rate)
+      value_of_base_minus_distribution_plus_interest = ( @base_value - yearly_distribution_after_tax_correction ) * (1 + @apr)
+      distribution_interest = InterestEarnedOnDistribution.new(yearly_distribution_after_tax_correction, @apr).total
       value_of_base_minus_distribution_plus_interest + distribution_interest
     end
   end
@@ -90,7 +93,7 @@ class Year
 end
 
 ##
-# The entire yearly distribution isn't taken out all once, so the amount of it
+# The entire yearly distribution isn't taken out all at once, so the amount of it
 # that's left each month still earns interest. For example, if the yearly distribution
 # is 60k, then at the beginning of January, 5k will be taken out. But 55k of the 
 # distribution will still earn interest for the month of Jan. This class calculates,
@@ -141,74 +144,42 @@ class InterestEarnedOnContribution
   end
 end
 
-# y = Year.new(10, 0, 10, 1, 0.0, 0.0, 0.1)
-# puts y.before_inflation
+class Compare
+  def initialize(principle, yearly_contribution)
+    @principle = principle
+    @yearly_contribution = yearly_contribution
+    @apr_worst = 0.04
+    @inflation_worst = 0.04
+    @apr_likely = 0.06
+    @inflation_likely = 0.0325
+    @apr_best = 0.08
+    @inflation_best = 0.01
+  end
 
-# d = InterestEarnedOnDistribution.new(60000, 0.06)
-# puts d.total
+  def go(years)
+    worst = Simulation.new(@principle, @yearly_contribution, @apr_worst, @inflation_worst, years).run
+    likely = Simulation.new(@principle, @yearly_contribution, @apr_likely, @inflation_likely, years).run
+    best = Simulation.new(@principle, @yearly_contribution, @apr_best, @inflation_best, years).run
+    puts "Worst case: #{ worst.pretty }"
+    puts "Likely case: #{ likely.pretty }"
+    puts "Best case: #{ best.pretty }"
+  end
+end
 
-# y = Year.new(60000, 0, 60000, 0.06, 0.03)
-# puts y.after_inflation
 
-# puts Year.new(0.0, 10, 0, 0.1, 0).after_inflation
-# i =  InterestEarnedOnContribution.new(10, 0.1)
-# i.total
-# p i.data
-
-s1 = Simulation.new(principle: 0,
-    yearly_contribution: 100,
-    yearly_distribution: 10,
-    distribution_tax_rate: 0,
-    monthly_ss: 1,
-    apr: 0,
-    inflation_rate: 0,
-    age_now: 20,
-    age_retire: 21,
-    age_die: 22)
+s1 = Simulation.new(principle: 40000,
+    yearly_contribution: 20000,
+    yearly_distribution: 60000,
+    distribution_tax_rate: 0.25,
+    monthly_ss: 3000,
+    apr: 0.06,
+    inflation_rate: 0.0325,
+    age_now: 36,
+    age_retire: 65,
+    age_die: 95)
 s1.run
 s1.data.each{|y, v| puts "#{y}: #{v}"}
 
-# x = 0.01
-# 400.times{
-#   s = Simulation.new(0, 10, 12, x, 0.0325, 36, 65, 95)
-#   s.run
-#   x += 0.001
-# }
-
 # Compare.new(40000, 20000).go(30)
 
-# puts Simulation.new(40000, 20000, 0.08, 0.03, 30).simulate.pretty
-# c = Simulation.new(40000, 20000, 0.06, 0.04, 30)
-# puts c.simulate
-
-# y = Year.new(40000, 0, 0.06, 0.02)
-# puts y.after_inflation
-
-# t = Contributions.new(1200, 0.06)
-# puts t.total
-
-
-# end
-
-# class Compare
-#   def initialize(principle, yearly_contribution)
-#     @principle = principle
-#     @yearly_contribution = yearly_contribution
-#     @apr_worst = 0.04
-#     @inflation_worst = 0.04
-#     @apr_likely = 0.06
-#     @inflation_likely = 0.0325
-#     @apr_best = 0.08
-#     @inflation_best = 0.01
-#   end
-
-#   def go(years)
-#     worst = Simulation.new(@principle, @yearly_contribution, @apr_worst, @inflation_worst, years).run
-#     likely = Simulation.new(@principle, @yearly_contribution, @apr_likely, @inflation_likely, years).run
-#     best = Simulation.new(@principle, @yearly_contribution, @apr_best, @inflation_best, years).run
-#     puts "Worst case: #{ worst.pretty }"
-#     puts "Likely case: #{ likely.pretty }"
-#     puts "Best case: #{ best.pretty }"
-#   end
-# end
 
