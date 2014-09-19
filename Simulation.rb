@@ -157,9 +157,6 @@ class Comparison
     @inflation_rate[:likely] = 0.0325
     @inflation_rate[:best] = 0.01
     @age_retire = {}
-    @age_retire[:worst] = 70
-    @age_retire[:likely] = 65
-    @age_retire[:best] = 60
   end
 
   def run
@@ -175,7 +172,7 @@ class Comparison
           apr: @apr[situation],
           inflation_rate: @inflation_rate[situation],
           age_now: 36,
-          age_retire: @age_retire[situation],
+          age_retire: 65,
           age_die: 95)
 
       simulation.run
