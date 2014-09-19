@@ -7,7 +7,10 @@ end
 class Simulation
   def initialize(principle: 40000,
         yearly_contribution: 20000, 
-        yearly_distribution: 60000, 
+        yearly_distribution: 60000,
+        distribution_tax_rate: 0.25,
+        monthly_ss: 2000,
+        social_security: 2000, 
         apr: 0.06, 
         inflation_rate: 0.0325, 
         age_now: 35, 
@@ -19,6 +22,9 @@ class Simulation
     @principle = principle
     @yearly_contribution = yearly_contribution
     @yearly_distribution = yearly_distribution
+    @distribution_tax_rate = distribution_tax_rate
+    @monthly_ss = monthly_ss
+    @social_security = social_security
     @apr = apr
     @inflation_rate = inflation_rate
     @age_now = age_now
@@ -31,17 +37,21 @@ class Simulation
     @value_at_end_of_year[@age_now] = @principle.to_f
     # Fill in values for accumulation years
     (@age_now+1..@age_retire).each do |x|
-      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], @yearly_contribution, 0, @apr, @inflation_rate).after_inflation
+      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], @yearly_contribution, 0, 0, @apr, @inflation_rate, @distribution_tax_rate).after_inflation
     end
 
     # Fill in values for distribution years
     (@age_retire+1..@age_die).each do |x|
-      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], 0, @yearly_distribution, @apr, @inflation_rate).after_inflation
+      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], 0, @yearly_distribution, @monthly_ss, @apr, @inflation_rate, @distribution_tax_rate).after_inflation
     end
   end
 
   def data
     @value_at_end_of_year
+  end
+
+  def rounded_data
+    s1.data.map{|y, v| "#{y}:#{v.pretty}"}.join(', ')
   end
 
   def last
@@ -50,12 +60,14 @@ class Simulation
 end
 
 class Year
-  def initialize(base_value, yearly_contribution, yearly_distribution, apr, inflation_rate)
+  def initialize(base_value, yearly_contribution, yearly_distribution, monthly_ss, apr, inflation_rate, distribution_tax_rate)
     @base_value = base_value
     @yearly_contribution = yearly_contribution
     @yearly_distribution = yearly_distribution
+    @monthly_ss = monthly_ss
     @apr = apr
     @inflation_rate = inflation_rate
+    @distribution_tax_rate = distribution_tax_rate
   end
 
   def before_inflation
@@ -63,8 +75,11 @@ class Year
       contribution_interest = InterestEarnedOnContribution.new(@yearly_contribution, @apr).total
       @base_value * (1 + @apr) + @yearly_contribution + contribution_interest
     elsif @yearly_distribution > 0 # in distribution phase
-      value_of_base_minus_distribution_plus_interest = ( @base_value - @yearly_distribution ) * (1 + @apr)
-      distribution_interest = InterestEarnedOnDistribution.new(@yearly_distribution, @apr).total
+      monthly_ss_after_taxes = @monthly_ss * (1 - @distribution_tax_rate)
+      yearly_ss_after_taxes = monthly_ss_after_taxes * 12
+      yearly_distribution_after_ss_correction = @yearly_distribution - yearly_ss_after_taxes
+      value_of_base_minus_distribution_plus_interest = ( @base_value - yearly_distribution_after_ss_correction ) * (1 + @apr)
+      distribution_interest = InterestEarnedOnDistribution.new(yearly_distribution_after_ss_correction, @apr).total
       value_of_base_minus_distribution_plus_interest + distribution_interest
     end
   end
@@ -126,7 +141,8 @@ class InterestEarnedOnContribution
   end
 end
 
-
+# y = Year.new(10, 0, 10, 1, 0.0, 0.0, 0.1)
+# puts y.before_inflation
 
 # d = InterestEarnedOnDistribution.new(60000, 0.06)
 # puts d.total
@@ -140,16 +156,16 @@ end
 # p i.data
 
 s1 = Simulation.new(principle: 0,
-    yearly_contribution: 10,
-    yearly_distribution: 20,
+    yearly_contribution: 100,
+    yearly_distribution: 10,
+    distribution_tax_rate: 0,
+    monthly_ss: 1,
     apr: 0,
     inflation_rate: 0,
     age_now: 20,
     age_retire: 21,
     age_die: 22)
 s1.run
-# puts s1.data.map{|y, v| "#{y}:#{v.pretty}"}.join(', ')
-
 s1.data.each{|y, v| puts "#{y}: #{v}"}
 
 # x = 0.01
