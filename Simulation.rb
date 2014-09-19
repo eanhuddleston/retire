@@ -10,7 +10,6 @@ class Simulation
         yearly_distribution: 60000,
         distribution_tax_rate: 0.25,
         monthly_ss: 2000,
-        social_security: 2000,
         apr: 0.06,
         inflation_rate: 0.0325,
         age_now: 35,
@@ -24,7 +23,6 @@ class Simulation
     @yearly_distribution = yearly_distribution
     @distribution_tax_rate = distribution_tax_rate
     @monthly_ss = monthly_ss
-    @social_security = social_security
     @apr = apr
     @inflation_rate = inflation_rate
     @age_now = age_now
@@ -144,42 +142,68 @@ class InterestEarnedOnContribution
   end
 end
 
-class Compare
-  def initialize(principle, yearly_contribution)
+class Comparison
+  def initialize(principle, yearly_contribution, yearly_distribution, monthly_ss)
     @principle = principle
     @yearly_contribution = yearly_contribution
-    @apr_worst = 0.04
-    @inflation_worst = 0.04
-    @apr_likely = 0.06
-    @inflation_likely = 0.0325
-    @apr_best = 0.08
-    @inflation_best = 0.01
+    @yearly_distribution = yearly_distribution
+    @monthly_ss = monthly_ss
+    @apr = {}
+    @apr[:worst] = 0.04
+    @apr[:likely] = 0.06
+    @apr[:best] = 0.08
+    @inflation_rate = {}
+    @inflation_rate[:worst] = 0.04
+    @inflation_rate[:likely] = 0.0325
+    @inflation_rate[:best] = 0.01
+    @age_retire = {}
+    @age_retire[:worst] = 70
+    @age_retire[:likely] = 65
+    @age_retire[:best] = 60
   end
 
-  def go(years)
-    worst = Simulation.new(@principle, @yearly_contribution, @apr_worst, @inflation_worst, years).run
-    likely = Simulation.new(@principle, @yearly_contribution, @apr_likely, @inflation_likely, years).run
-    best = Simulation.new(@principle, @yearly_contribution, @apr_best, @inflation_best, years).run
-    puts "Worst case: #{ worst.pretty }"
-    puts "Likely case: #{ likely.pretty }"
-    puts "Best case: #{ best.pretty }"
+  def run
+    value_at_death = {}
+
+    [:worst, :likely, :best].each do |situation|
+      simulation = Simulation.new(
+          principle: @principle, 
+          yearly_contribution: @yearly_contribution, 
+          yearly_distribution: @yearly_distribution,
+          distribution_tax_rate: 0.25,
+          monthly_ss: @monthly_ss,
+          apr: @apr[situation],
+          inflation_rate: @inflation_rate[situation],
+          age_now: 36,
+          age_retire: @age_retire[situation],
+          age_die: 95)
+
+      simulation.run
+      value_at_death[situation] = simulation.last.pretty
+    end
+
+    puts "Worst case: #{ value_at_death[:worst] }"
+    puts "Likely case: #{ value_at_death[:likely] }"
+    puts "Best case: #{ value_at_death[:best] }"
   end
 end
 
+c = Comparison.new(40000, 20000, 60000, 3000)
+c.run
 
-s1 = Simulation.new(principle: 40000,
-    yearly_contribution: 20000,
-    yearly_distribution: 60000,
-    distribution_tax_rate: 0.25,
-    monthly_ss: 3000,
-    apr: 0.06,
-    inflation_rate: 0.0325,
-    age_now: 36,
-    age_retire: 65,
-    age_die: 95)
-s1.run
-s1.data.each{|y, v| puts "#{y}: #{v}"}
 
-# Compare.new(40000, 20000).go(30)
+# s1 = Simulation.new(principle: 40000,
+#     yearly_contribution: 20000,
+#     yearly_distribution: 60000,
+#     distribution_tax_rate: 0.25,
+#     monthly_ss: 3000,
+#     apr: 0.06,
+#     inflation_rate: 0.0325,
+#     age_now: 36,
+#     age_retire: 65,
+#     age_die: 95)
+# s1.run
+# s1.data.each{|y, v| puts "#{y}: #{v}"}
+
 
 
