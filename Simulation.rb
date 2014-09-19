@@ -5,7 +5,7 @@ class Float
 end
 
 class Simulation
-  def initialize(principle: 40000,
+  def initialize(currently_saved: 40000,
         yearly_contribution: 20000, 
         yearly_distribution: 60000,
         distribution_tax_rate: 0.25,
@@ -18,7 +18,7 @@ class Simulation
     unless age_now < age_retire and age_retire < age_die
       raise RuntimeError.new 'Get your ages straight, man'
     end
-    @principle = principle
+    @currently_saved = currently_saved
     @yearly_contribution = yearly_contribution
     @yearly_distribution = yearly_distribution
     @distribution_tax_rate = distribution_tax_rate
@@ -32,7 +32,7 @@ class Simulation
 
   def run
     @value_at_end_of_year = {}
-    @value_at_end_of_year[@age_now] = @principle.to_f
+    @value_at_end_of_year[@age_now] = @currently_saved.to_f
     # Fill in values for accumulation years
     (@age_now+1..@age_retire).each do |x|
       @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], @yearly_contribution, 0, 0, @apr, @inflation_rate, @distribution_tax_rate).after_inflation
@@ -143,8 +143,8 @@ class InterestEarnedOnContribution
 end
 
 class Comparison
-  def initialize(principle, yearly_contribution, yearly_distribution, monthly_ss)
-    @principle = principle
+  def initialize(currently_saved, yearly_contribution, yearly_distribution, monthly_ss)
+    @currently_saved = currently_saved
     @yearly_contribution = yearly_contribution
     @yearly_distribution = yearly_distribution
     @monthly_ss = monthly_ss
@@ -164,7 +164,7 @@ class Comparison
 
     [:worst, :likely, :best].each do |situation|
       simulation = Simulation.new(
-          principle: @principle, 
+          currently_saved: @currently_saved, 
           yearly_contribution: @yearly_contribution, 
           yearly_distribution: @yearly_distribution,
           distribution_tax_rate: 0.25,
@@ -189,7 +189,7 @@ c = Comparison.new(40000, 20000, 60000, 3000)
 c.run
 
 
-# s1 = Simulation.new(principle: 40000,
+# s1 = Simulation.new(currently_saved: 40000,
 #     yearly_contribution: 20000,
 #     yearly_distribution: 60000,
 #     distribution_tax_rate: 0.25,
