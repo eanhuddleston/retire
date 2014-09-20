@@ -1,20 +1,27 @@
+##
+# Monkeypatch to create method for converting float into nicely formatted string
+# with dollar sign at front and commas in correct places.
+#
 class Float
   def pretty
     '$' + self.round.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse
   end
 end
 
+##
+# High level class for actually running one full retirement simulation, given all input parameters.
+#
 class Simulation
-  def initialize(currently_saved: 40000,
-        yearly_contribution: 20000, 
-        yearly_distribution: 60000,
+  def initialize(currently_saved: 80000,
+        yearly_contribution: 15000,
+        yearly_distribution: 100000,
         distribution_tax_rate: 0.25,
-        monthly_ss: 2000,
+        monthly_ss: 1000,
         apr: 0.06,
         inflation_rate: 0.0325,
-        age_now: 35,
+        age_now: 25,
         age_retire: 65,
-        age_die: 95)
+        age_die: 90)
     unless age_now < age_retire and age_retire < age_die
       raise RuntimeError.new 'Get your ages straight, man'
     end
@@ -57,6 +64,10 @@ class Simulation
   end
 end
 
+##
+# Class to do all the calculations for one year to determine what amount of money is left at 
+# the end of the year taking into account all contributions, distributions, taxes, etc.
+#
 class Year
   def initialize(base_value, yearly_contribution, yearly_distribution, monthly_ss, apr, inflation_rate, distribution_tax_rate)
     @base_value = base_value
@@ -68,6 +79,9 @@ class Year
     @distribution_tax_rate = distribution_tax_rate
   end
 
+  ##
+  # Returns the amount of money left at the end of the year before inflation has been considered.
+  #
   def before_inflation
     if @yearly_contribution > 0 # in contribution phase
       contribution_interest = InterestEarnedOnContribution.new(@yearly_contribution, @apr).total
@@ -121,7 +135,12 @@ class InterestEarnedOnDistribution
   end
 end
 
-
+##
+# Contributions are likely made monthly, not yearly. This means that a contribution in Jan.
+# will earn interest for the entire year, but a contribution in Dec. will earn interest for
+# only one month. This class determines, for contributions made throughout the year, what interest 
+# has accumulated on them.
+#
 class InterestEarnedOnContribution
   def initialize(yearly_contribution, apr)
     @yearly_contribution = yearly_contribution
@@ -153,9 +172,9 @@ class Comparison
     @apr[:likely] = 0.06
     @apr[:best] = 0.08
     @inflation_rate = {}
-    @inflation_rate[:worst] = 0.04
+    @inflation_rate[:worst] = 0.05
     @inflation_rate[:likely] = 0.0325
-    @inflation_rate[:best] = 0.01
+    @inflation_rate[:best] = 0.02
     @age_retire = {}
   end
 
@@ -164,16 +183,16 @@ class Comparison
 
     [:worst, :likely, :best].each do |situation|
       simulation = Simulation.new(
-          currently_saved: @currently_saved, 
-          yearly_contribution: @yearly_contribution, 
+          currently_saved: @currently_saved,
+          yearly_contribution: @yearly_contribution,
           yearly_distribution: @yearly_distribution,
-          distribution_tax_rate: 0.25,
+          distribution_tax_rate: 0.15,
           monthly_ss: @monthly_ss,
           apr: @apr[situation],
           inflation_rate: @inflation_rate[situation],
           age_now: 36,
-          age_retire: 65,
-          age_die: 95)
+          age_retire: 70,
+          age_die: 92)
 
       simulation.run
       value_at_death[situation] = simulation.last.pretty
@@ -185,14 +204,14 @@ class Comparison
   end
 end
 
-c = Comparison.new(40000, 20000, 60000, 3000)
+c = Comparison.new(40000, 20000, 74000, 3000)
 c.run
 
 
 # s1 = Simulation.new(currently_saved: 40000,
 #     yearly_contribution: 20000,
-#     yearly_distribution: 60000,
-#     distribution_tax_rate: 0.25,
+#     yearly_distribution: 74000,
+#     distribution_tax_rate: 0.15,
 #     monthly_ss: 3000,
 #     apr: 0.06,
 #     inflation_rate: 0.0325,
