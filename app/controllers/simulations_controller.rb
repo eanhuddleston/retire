@@ -18,5 +18,6 @@ class SimulationsController < ApplicationController
         age_die: params[:age_die].to_i)
     s1.run
     @data = s1.data
+    gon.data = s1.data_as_hash
   end
 end

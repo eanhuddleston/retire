@@ -53,6 +53,9 @@ GEM
     factory_girl_rails (4.4.1)
       factory_girl (~> 4.4.0)
       railties (>= 3.0.0)
+    gon (4.1.1)
+      actionpack (>= 2.3.0)
+      json
     haml (4.0.4)
       tilt
     haml-rails (0.4)
@@ -145,6 +148,7 @@ DEPENDENCIES
   binding_of_caller
   coffee-rails (~> 3.2.1)
   factory_girl_rails
+  gon
   haml
   haml-rails
   jquery-rails

@@ -55,6 +55,10 @@ class Simulation
     @value_at_end_of_year.map{ |k,v| [k, v.to_i] }
   end
 
+  def data_as_hash
+    @value_at_end_of_year.map{ |k,v| { 'x' => k, 'y' => v } }
+  end
+
   def rounded_data
     s1.data.map{|y, v| "#{y}:#{v.pretty}"}.join(', ')
   end
