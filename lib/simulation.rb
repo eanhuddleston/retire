@@ -52,7 +52,7 @@ class Simulation
   end
 
   def data
-    @value_at_end_of_year
+    @value_at_end_of_year.map{ |k,v| [k, v.to_i] }
   end
 
   def rounded_data
@@ -204,9 +204,8 @@ class Comparison
   end
 end
 
-c = Comparison.new(40000, 20000, 74000, 3000)
-c.run
-
+# c = Comparison.new(40000, 20000, 74000, 3000)
+# c.run
 
 # s1 = Simulation.new(currently_saved: 40000,
 #     yearly_contribution: 20000,

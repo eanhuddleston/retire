@@ -1,4 +1,12 @@
 Retire::Application.routes.draw do
+  # get 'simulations/run', to: 'simulations#run'
+
+  resources(:simulations, only: [:index]) do
+    collection do
+      get 'run'
+    end
+  end 
+
   # The priority is based upon order of creation:
   # first created -> highest priority.
 

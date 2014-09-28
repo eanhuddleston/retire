@@ -1,0 +1,36 @@
+%h1 Run new simulation
+
+= form_tag({:action => :run}, :method => :get, id: "none") do
+  Currently saved:
+  = text_field_tag(:currently_saved, '50000')
+  %br
+  Yearly contribution:
+  = text_field_tag(:yearly_contribution, '20000')
+  %br
+  Yearly distribution:
+  = text_field_tag(:yearly_distribution, '74000')
+  %br
+  Distribution tax rate:
+  = text_field_tag(:distribution_tax_rate, '0.25')
+  %br
+  Monthly social security:
+  = text_field_tag(:monthly_ss, '1000')
+  %br
+  Expected annual interest rate:
+  = text_field_tag(:apr, '0.06')
+  %br
+  Expected inflation rate:
+  = text_field_tag(:inflation_rate, '0.0325')
+  %br
+  Age now:
+  = text_field_tag(:age_now, 25)
+  %br
+  Age at retirement:
+  = text_field_tag(:age_retire, 65)
+  %br
+  Age at death:
+  = text_field_tag(:age_die, 90)
+
+  %br
+  %br
+  = submit_tag("Run simulation", :name => nil)
