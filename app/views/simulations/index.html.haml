@@ -11,10 +11,10 @@
   = text_field_tag(:yearly_distribution, '74000')
   %br
   Distribution tax rate:
-  = text_field_tag(:distribution_tax_rate, '0.25')
+  = text_field_tag(:distribution_tax_rate, '0.15')
   %br
   Monthly social security:
-  = text_field_tag(:monthly_ss, '1000')
+  = text_field_tag(:monthly_ss, '3000')
   %br
   Expected annual interest rate:
   = text_field_tag(:apr, '0.06')
@@ -34,3 +34,10 @@
   %br
   %br
   = submit_tag("Run simulation", :name => nil)
+
+/ / Create div for D3.js
+/ %svg{id: "svg", width: "1000", height: "500"}
+/ :javascript
+/   $(document).ready ( function() {
+/     InitChart();
+/   });

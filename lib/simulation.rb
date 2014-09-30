@@ -56,7 +56,7 @@ class Simulation
   end
 
   def data_as_hash
-    @value_at_end_of_year.map{ |k,v| { 'x' => k, 'y' => v } }
+    @value_at_end_of_year.map{ |k,v| { 'age' => k, 'amount' => v.to_i } }
   end
 
   def rounded_data

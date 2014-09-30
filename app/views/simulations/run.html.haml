@@ -1,11 +1,16 @@
-%svg{id: "visualization", width: "1000", height: "500"}
-= javascript_include_tag('chart')
+/ Create div for D3.js
+%svg{id: "svg", width: "1000", height: "500"}
 
-%table
-  %tr
-    %th Age
-    %th Value
-  - @data.each do |age, value|
-    %tr
-      %td= age
-      %td= value
+:javascript
+  $(document).ready ( function() {
+    InitChart();
+  });
+
+/ %table
+/   %tr
+/     %th Age
+/     %th Value
+/   - @data.each do |age, value|
+/     %tr
+/       %td= age
+/       %td= value
