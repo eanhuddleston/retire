@@ -45,9 +45,14 @@ function InitChart() {
       .orient("left")
       .tickSubdivide(true);
 
+  // svg.append('svg:g')
+  //   .attr('class', 'x axis')
+  //   .attr('transform', 'translate(0,' + (HEIGHT - MARGINS.bottom) + ')')
+  //   .call(xAxis);
+
   svg.append('svg:g')
     .attr('class', 'x axis')
-    .attr('transform', 'translate(0,' + (HEIGHT - MARGINS.top) + ')')
+    .attr('transform', 'translate(0,' + y(0) + ')')
     .call(xAxis);
 
   svg.append('svg:g')
