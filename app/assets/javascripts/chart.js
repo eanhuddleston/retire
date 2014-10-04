@@ -27,7 +27,7 @@ function InitChart() {
       })),
 
     y = d3.scale.linear()
-      .range([HEIGHT - MARGINS.top, MARGINS.bottom])
+      .range([HEIGHT - MARGINS.bottom, MARGINS.top])
       .domain([d3.min(gon.data, function(d) {
         return yMin
       }), d3.max(gon.data, function(d) {
