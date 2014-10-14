@@ -1,4 +1,4 @@
-// gon.data = [
+// window.data = [
 //   { 'x': 30, 'y': 30000 },
 //   { 'x': 31, 'y': 40000 }];
 //   ...
@@ -6,13 +6,15 @@
 function InitChart() {
 
   yMin = 0;
-  yDataMin = d3.min(gon.data, function(d) { return d.amount })
+  yDataMin = d3.min(window.data, function(d) { return d.amount })
   if (yDataMin < 0) {
     yMin = yDataMin;
   }
 
+  $('#svg').empty();
+
   window.svg = d3.select('#svg'),
-    WIDTH = 900,
+    WIDTH = 1200,
     HEIGHT = 400,
     MARGINS = {
       top: 20,
@@ -22,15 +24,15 @@ function InitChart() {
     },
     x = d3.scale.ordinal()
       .rangeRoundBands([MARGINS.left, WIDTH - MARGINS.right], 0.1)
-      .domain(gon.data.map(function (d) {
+      .domain(window.data.map(function (d) {
         return d.age;
       })),
 
     y = d3.scale.linear()
       .range([HEIGHT - MARGINS.bottom, MARGINS.top])
-      .domain([d3.min(gon.data, function(d) {
+      .domain([d3.min(window.data, function(d) {
         return yMin
-      }), d3.max(gon.data, function(d) {
+      }), d3.max(window.data, function(d) {
         return d.amount
       })]),
 
@@ -61,7 +63,7 @@ function InitChart() {
     .call(yAxis);
 
   svg.selectAll('rect')
-    .data(gon.data)
+    .data(window.data)
     .enter()
     .append('rect')
     .attr('x', function (d) {

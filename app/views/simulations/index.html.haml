@@ -1,6 +1,6 @@
-%h1 Run new simulation
+%h1 Retirement Financial Simulator
 
-= form_tag({:action => :run}, :method => :get, id: "none") do
+= form_tag({controller: :simulations, action: :run, method: :post}, {remote: true}) do
   Currently saved:
   = text_field_tag(:currently_saved, '50000')
   %br
@@ -33,11 +33,7 @@
 
   %br
   %br
-  = submit_tag("Run simulation", :name => nil)
+  = submit_tag("Run simulation", name: nil)
 
-/ / Create div for D3.js
-/ %svg{id: "svg", width: "1000", height: "500"}
-/ :javascript
-/   $(document).ready ( function() {
-/     InitChart();
-/   });
+/ Create div for D3.js
+%svg{id: "svg", width: "1200", height: "500"}

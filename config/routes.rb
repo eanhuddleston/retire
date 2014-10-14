@@ -3,7 +3,7 @@ Retire::Application.routes.draw do
 
   resources(:simulations, only: [:index]) do
     collection do
-      get 'run'
+      post 'run', defaults: { format: :js }
     end
   end 
 
