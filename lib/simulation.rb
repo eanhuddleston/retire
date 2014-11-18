@@ -83,6 +83,10 @@ end
 ##
 # Class to do all the calculations for one year to determine what amount of money is left at 
 # the end of the year taking into account all contributions, distributions, taxes, etc.
+# Each Year object is instantiated with a 'phase', which can be either 'distribution'
+# or 'contribution', indicating whether the current year is in the contribution or
+# distribution period. It can also be set to 'none', for calculations involving changes
+# to the base_value from only inflation and/or interest earned.
 #
 class Year
   def initialize(base_value: 0, 

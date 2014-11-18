@@ -3,9 +3,9 @@ require 'simulation'
 require 'pry'
 
 describe Year do
-  let(:inputs) { { base_value: 100, 
-        yearly_contribution: 0, 
-        yearly_distribution: 0, 
+  let(:inputs) { { base_value: 100,
+        yearly_contribution: 0,
+        yearly_distribution: 0,
         monthly_ss: 0,
         apr: 0,
         inflation_rate: 0,
