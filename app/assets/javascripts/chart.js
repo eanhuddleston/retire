@@ -58,9 +58,16 @@ function InitChart() {
     .call(xAxis);
 
   svg.append('svg:g')
-    .attr('class', 'y axis')
-    .attr('transform', 'translate(' + (MARGINS.left) + ',0)')
-    .call(yAxis);
+      .attr('class', 'y axis')
+      .attr('transform', 'translate(' + (MARGINS.left) + ',0)')
+      .call(yAxis)
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("transform", "translate(0,0)")
+      .attr("y", ((HEIGHT-MARGINS.bottom)/2))
+      .attr("dy", "2em")
+      .style("text-anchor", "end")
+      // .text("Dollars");
 
   svg.selectAll('rect')
     .data(window.data)

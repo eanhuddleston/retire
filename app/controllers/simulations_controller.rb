@@ -2,9 +2,11 @@ class SimulationsController < ApplicationController
   require 'simulation'
 
   def index
-
   end
 
+  ##
+  # Used for AJAX request.
+  #
   def run
     respond_to do |format|
       format.js {
@@ -30,7 +32,4 @@ class SimulationsController < ApplicationController
     end
   end
 
-  def get_simulation_data
-
-  end
 end

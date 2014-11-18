@@ -1,39 +1,40 @@
-%h1 Retirement Financial Simulator
+%h2 Retirement Financial Simulator
 
 = form_tag({controller: :simulations, action: :run, method: :post}, {remote: true}) do
-  Currently saved:
-  = text_field_tag(:currently_saved, '50000')
-  %br
-  Yearly contribution:
-  = text_field_tag(:yearly_contribution, '20000')
-  %br
-  Yearly distribution:
-  = text_field_tag(:yearly_distribution, '74000')
-  %br
-  Distribution tax rate:
-  = text_field_tag(:distribution_tax_rate, '0.15')
-  %br
-  Monthly social security:
-  = text_field_tag(:monthly_ss, '3000')
-  %br
-  Expected annual interest rate:
-  = text_field_tag(:apr, '0.06')
-  %br
-  Expected inflation rate:
-  = text_field_tag(:inflation_rate, '0.0325')
-  %br
-  Age now:
-  = text_field_tag(:age_now, 30)
-  %br
-  Age at retirement:
-  = text_field_tag(:age_retire, 65)
-  %br
-  Age at death:
-  = text_field_tag(:age_die, 90)
-
-  %br
-  %br
-  = submit_tag("Run simulation", name: nil)
+  %table
+    %tr
+      %td Currently saved:
+      %td= text_field_tag(:currently_saved, '50000')
+    %tr
+      %td Yearly contribution:
+      %td= text_field_tag(:yearly_contribution, '20000')
+    %tr
+      %td Yearly distribution:
+      %td= text_field_tag(:yearly_distribution, '74000')
+    %tr
+      %td Distribution tax rate:
+      %td= text_field_tag(:distribution_tax_rate, '0.15')
+    %tr
+      %td Monthly social security:
+      %td= text_field_tag(:monthly_ss, '3000')
+    %tr
+      %td Expected annual interest rate:
+      %td= text_field_tag(:apr, '0.06')
+    %tr
+      %td Expected inflation rate:
+      %td= text_field_tag(:inflation_rate, '0.0325')
+    %tr
+      %td Age now:
+      %td= text_field_tag(:age_now, 30)
+    %tr
+      %td Age at retirement:
+      %td= text_field_tag(:age_retire, 65)
+    %tr
+      %td Age at death:
+      %td= text_field_tag(:age_die, 90)
+    %tr
+      %td
+      %td= submit_tag("Run simulation", name: nil)
 
 / Create div for D3.js
 %svg{id: "svg", width: "1200", height: "500"}

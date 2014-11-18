@@ -40,14 +40,26 @@ class Simulation
   def run
     @value_at_end_of_year = {}
     @value_at_end_of_year[@age_now] = @currently_saved.to_f
+    year_inputs = { base_value: 0, 
+              yearly_contribution: @yearly_contribution, 
+              yearly_distribution: @yearly_distribution,
+              monthly_ss: @monthly_ss,
+              apr: @apr,
+              inflation_rate: @inflation_rate,
+              distribution_tax_rate: @distribution_tax_rate }
+
     # Fill in values for accumulation years
+    year_inputs[:phase] = :contribution
     (@age_now+1..@age_retire).each do |x|
-      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], @yearly_contribution, 0, 0, @apr, @inflation_rate, @distribution_tax_rate).after_inflation
+      year_inputs[:base_value] = @value_at_end_of_year[x-1]
+      @value_at_end_of_year[x] = Year.new(year_inputs).after_inflation
     end
 
     # Fill in values for distribution years
+    year_inputs[:phase] = :distribution
     (@age_retire+1..@age_die).each do |x|
-      @value_at_end_of_year[x] = Year.new(@value_at_end_of_year[x-1], 0, @yearly_distribution, @monthly_ss, @apr, @inflation_rate, @distribution_tax_rate).after_inflation
+      year_inputs[:base_value] = @value_at_end_of_year[x-1]
+      @value_at_end_of_year[x] = Year.new(year_inputs).after_inflation
     end
   end
 
@@ -73,7 +85,14 @@ end
 # the end of the year taking into account all contributions, distributions, taxes, etc.
 #
 class Year
-  def initialize(base_value, yearly_contribution, yearly_distribution, monthly_ss, apr, inflation_rate, distribution_tax_rate)
+  def initialize(base_value: 0, 
+        yearly_contribution: 0, 
+        yearly_distribution: 0, 
+        monthly_ss: 0,
+        apr: 0,
+        inflation_rate: 0,
+        distribution_tax_rate: 0,
+        phase: :none)
     @base_value = base_value
     @yearly_contribution = yearly_contribution
     @yearly_distribution = yearly_distribution
@@ -81,16 +100,20 @@ class Year
     @apr = apr
     @inflation_rate = inflation_rate
     @distribution_tax_rate = distribution_tax_rate
+    @phase = phase
   end
 
   ##
   # Returns the amount of money left at the end of the year before inflation has been considered.
   #
   def before_inflation
-    if @yearly_contribution > 0 # in contribution phase
+    if @phase == :none
+      return @base_value * (1 + @apr) if @apr > 0  # earning interest
+      return @base_value  # not earning interest
+    elsif @phase == :contribution
       contribution_interest = InterestEarnedOnContribution.new(@yearly_contribution, @apr).total
       @base_value * (1 + @apr) + @yearly_contribution + contribution_interest
-    elsif @yearly_distribution > 0 # in distribution phase
+    elsif @phase == :distribution
       monthly_ss_after_taxes = @monthly_ss * (1 - @distribution_tax_rate)
       yearly_ss_after_taxes = monthly_ss_after_taxes * 12
       # Don't need to take out full amount needed, as some provided by SS
@@ -103,6 +126,13 @@ class Year
     end
   end
 
+  ##
+  # Calculate the value of what's left at the end of the year after inflation.
+  # One way to think of this calculation:
+  #   if inflation rate is 10%, then current value = future value + 10%:
+  #   current value = future value * (1 + inflation rate)
+  #   so: future value = current value / (1 + inflation rate)
+  #
   def after_inflation
     self.before_inflation / (1 + @inflation_rate)
   end
