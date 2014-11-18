@@ -23,7 +23,7 @@ class Simulation
         age_retire: 65,
         age_die: 90)
     unless age_now < age_retire and age_retire < age_die
-      raise RuntimeError.new 'Get your ages straight, man'
+      raise RuntimeError.new 'Required: age_now < age_retire < age_death'
     end
     @currently_saved = currently_saved
     @yearly_contribution = yearly_contribution
