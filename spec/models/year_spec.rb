@@ -2,6 +2,24 @@ require 'spec_helper'
 require 'simulation'
 require 'pry'
 
+describe InterestEarnedOnContribution do
+  it "calculates the interest earned on contributions made throughout the year" do
+    expect( InterestEarnedOnContribution.new(12, 0.1).total.round(2) ).to eq(0.65)
+    # Each number represents the interest earned by that month's distribution during
+    # the remainder of the year:
+    # monthly data: [0.1, 0.0917, 0.0833, 0.075, 0.0667, 0.0583, 0.05, 0.0417, 0.0333, 0.025, 0.0167, 0.0083]
+  end
+end
+
+describe InterestEarnedOnDistribution do
+  it "calculates the interest earned on a yearly distribution that's withdrawn monthly" do
+    expect( InterestEarnedOnDistribution.new(12, 0.1).total.round(2) ).to eq(0.55)
+    # Each number represents the interest earned during *that month* on whatever remains
+    # of distribution:
+    # [0.0917, 0.0833, 0.075, 0.0667, 0.0583, 0.05, 0.0417, 0.0333, 0.025, 0.0167, 0.0083, 0.0]
+  end
+end
+
 describe Year do
   let(:inputs) { { base_value: 100,
         yearly_contribution: 0,
@@ -41,4 +59,5 @@ describe Year do
       end
     end
   end
+
 end

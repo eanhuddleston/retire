@@ -171,13 +171,17 @@ class InterestEarnedOnDistribution
     # Return the total interest earned on the remaining parts of distribution throughout year
     @interest_earned_during_each_month.values.inject(:+)
   end
+
+  def data
+    @interest_earned_during_each_month
+  end
 end
 
 ##
-# Contributions are likely made monthly, not yearly. This means that a contribution in Jan.
-# will earn interest for the entire year, but a contribution in Dec. will earn interest for
-# only one month. This class determines, for contributions made throughout the year, what interest 
-# has accumulated on them.
+# With monthly contributions, and assuming contributions are made at the beginning of the month,
+# this means that a contribution in Jan. will earn interest for the entire year, but a contribution 
+# in Dec. will earn interest for only one month. This class determines the total interest that 
+# has accumulated on monthly contributions at the end of the year.
 #
 class InterestEarnedOnContribution
   def initialize(yearly_contribution, apr)
@@ -189,7 +193,7 @@ class InterestEarnedOnContribution
   def total
     @interest_earned_from_each_contribution = {}
     (1..12).each do |x|
-      @interest_earned_from_each_contribution[x] = @monthly_contribution * @apr * ((12 - x) / 12.0)
+      @interest_earned_from_each_contribution[x] = @monthly_contribution * @apr * ((13 - x) / 12.0)
     end
     @interest_earned_from_each_contribution.values.inject(:+)
   end
