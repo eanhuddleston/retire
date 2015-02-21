@@ -2,6 +2,20 @@ require 'spec_helper'
 require 'simulation'
 require 'pry'
 
+describe SimulateToRetirement do
+  let(:inputs) { { 
+    currently_saved: 50000,
+    yearly_contribution: 0,
+    interest_rate: 0.06,
+    inflation_rate: 0.03,
+    years: 30 } }
+  it "matches value calculated with formulas" do
+    # value at end of 30 years: after_interest = 50000 * (1+(0.06))^30
+    # value after inflation: after_inflation = after_interest/(0.03^30)
+    expect( SimulateToRetirement.new(inputs).last.round(0) ).to eq(118312)
+  end
+end
+
 describe InterestEarnedOnContribution do
   it "calculates the interest earned on contributions made throughout the year" do
     expect( InterestEarnedOnContribution.new(12, 0.1).total.round(2) ).to eq(0.65)
@@ -25,12 +39,13 @@ describe Year do
         yearly_contribution: 0,
         yearly_distribution: 0,
         monthly_ss: 0,
-        apr: 0,
+        interest_rate: 0,
         inflation_rate: 0,
         distribution_tax_rate: 0,
-        phase: :none } }
+        phase: :none,
+        contribute_monthly: false } }
 
-  context 'before inflation' do
+  context '#before inflation' do
     it "adds the yearly contribution to the base value" do
       inputs[:yearly_contribution] = 10
       inputs[:phase] = :contribution
@@ -44,7 +59,7 @@ describe Year do
     end
   end
 
-  context 'after inflation' do
+  context '#after inflation' do
     it "returns the value of the base value after inflation" do
       inputs[:inflation_rate] = 0.1
       expect(Year.new(inputs).after_inflation.round(2)).to eq(90.91)

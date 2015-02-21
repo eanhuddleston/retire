@@ -11,13 +11,13 @@ end
 ##
 # High level class for actually running one full retirement simulation, given all input parameters.
 #
-class Simulation
+class SimulateToDeath
   def initialize(currently_saved: 80000,
         yearly_contribution: 15000,
         yearly_distribution: 100000,
         distribution_tax_rate: 0.25,
         monthly_ss: 1000,
-        apr: 0.06,
+        interest_rate: 0.06,
         inflation_rate: 0.0325,
         age_now: 25,
         age_retire: 65,
@@ -30,7 +30,7 @@ class Simulation
     @yearly_distribution = yearly_distribution
     @distribution_tax_rate = distribution_tax_rate
     @monthly_ss = monthly_ss
-    @apr = apr
+    @interest_rate = interest_rate
     @inflation_rate = inflation_rate
     @age_now = age_now
     @age_retire = age_retire
@@ -44,7 +44,7 @@ class Simulation
               yearly_contribution: @yearly_contribution, 
               yearly_distribution: @yearly_distribution,
               monthly_ss: @monthly_ss,
-              apr: @apr,
+              interest_rate: @interest_rate,
               inflation_rate: @inflation_rate,
               distribution_tax_rate: @distribution_tax_rate }
 
@@ -81,6 +81,59 @@ class Simulation
 end
 
 ##
+# High level class for running a simulation until retirement.
+#
+class SimulateToRetirement
+  def initialize(currently_saved: 50000,
+        yearly_contribution: 0,
+        interest_rate: 0.06,
+        inflation_rate: 0,
+        savings_increase_rate: 0,
+        years: 30)
+    @currently_saved = currently_saved
+    @yearly_contribution = yearly_contribution
+    @interest_rate = interest_rate
+    @inflation_rate = inflation_rate
+    @savings_increase_rate = savings_increase_rate
+    @years = years
+    self.run
+  end
+
+  def run
+    @value_at_end_of_year = {}
+    @value_at_end_of_year[0] = @currently_saved.to_f
+    year_inputs = { base_value: 0,
+              interest_rate: @interest_rate,
+              inflation_rate: @inflation_rate }
+
+    # Fill in values for accumulation years
+    year_inputs[:phase] = :contribution
+    (1..@years).each do |x|
+      year_inputs[:base_value] = @value_at_end_of_year[x-1]
+      # yearly_contribution will stay constant if @savings_increase_rate == 0
+      year_inputs[:yearly_contribution] = @yearly_contribution * (1 + @savings_increase_rate)**x
+      @value_at_end_of_year[x] = Year.new(year_inputs).after_inflation
+    end
+  end
+
+  def data
+    @value_at_end_of_year.map{ |k,v| [k, v.to_i] }
+  end
+
+  def data_as_hash
+    @value_at_end_of_year.map{ |k,v| { 'age' => k, 'amount' => v.to_i } }
+  end
+
+  def rounded_data
+    s1.data.map{|y, v| "#{y}:#{v.pretty}"}.join(', ')
+  end
+
+  def last
+    @value_at_end_of_year.values.last
+  end
+end
+
+##
 # Class to do all the calculations for one year to determine what amount of money is left at 
 # the end of the year taking into account all contributions, distributions, taxes, etc.
 # Each Year object is instantiated with a 'phase', which can be either 'distribution'
@@ -89,22 +142,24 @@ end
 # to the base_value from only inflation and/or interest earned.
 #
 class Year
-  def initialize(base_value: 0, 
-        yearly_contribution: 0, 
-        yearly_distribution: 0, 
+  def initialize(base_value: 0,
+        yearly_contribution: 0,
+        yearly_distribution: 0,
         monthly_ss: 0,
-        apr: 0,
+        interest_rate: 0,
         inflation_rate: 0,
         distribution_tax_rate: 0,
-        phase: :none)
+        phase: :none,
+        contribute_monthly: false)
     @base_value = base_value
     @yearly_contribution = yearly_contribution
     @yearly_distribution = yearly_distribution
     @monthly_ss = monthly_ss
-    @apr = apr
+    @interest_rate = interest_rate
     @inflation_rate = inflation_rate
     @distribution_tax_rate = distribution_tax_rate
     @phase = phase
+    @contribute_monthly = contribute_monthly
   end
 
   ##
@@ -112,11 +167,15 @@ class Year
   #
   def before_inflation
     if @phase == :none
-      return @base_value * (1 + @apr) if @apr > 0  # earning interest
+      return @base_value * (1 + @interest_rate) if @interest_rate > 0  # earning interest
       return @base_value  # not earning interest
     elsif @phase == :contribution
-      contribution_interest = InterestEarnedOnContribution.new(@yearly_contribution, @apr).total
-      @base_value * (1 + @apr) + @yearly_contribution + contribution_interest
+      if @contribute_monthly
+        contribution_interest = InterestEarnedOnContribution.new(@yearly_contribution, @interest_rate).total
+      else
+        contribution_interest = 0
+      end
+      @base_value * (1 + @interest_rate) + @yearly_contribution + contribution_interest
     elsif @phase == :distribution
       monthly_ss_after_taxes = @monthly_ss * (1 - @distribution_tax_rate)
       yearly_ss_after_taxes = monthly_ss_after_taxes * 12
@@ -124,8 +183,8 @@ class Year
       yearly_distribution_minus_ss_contribution = @yearly_distribution - yearly_ss_after_taxes
       # But, of that needed after SS, need to take out enough to pay for taxes (and still have desired amount left)
       yearly_distribution_after_tax_correction = yearly_distribution_minus_ss_contribution / (1 - @distribution_tax_rate)
-      value_of_base_minus_distribution_plus_interest = ( @base_value - yearly_distribution_after_tax_correction ) * (1 + @apr)
-      distribution_interest = InterestEarnedOnDistribution.new(yearly_distribution_after_tax_correction, @apr).total
+      value_of_base_minus_distribution_plus_interest = ( @base_value - yearly_distribution_after_tax_correction ) * (1 + @interest_rate)
+      distribution_interest = InterestEarnedOnDistribution.new(yearly_distribution_after_tax_correction, @interest_rate).total
       value_of_base_minus_distribution_plus_interest + distribution_interest
     end
   end
@@ -151,10 +210,10 @@ end
 # earns, then returns the sum of all the interest earned (on the distribution amount).
 #
 class InterestEarnedOnDistribution
-  def initialize(yearly_distribution, apr)
+  def initialize(yearly_distribution, interest_rate)
     @yearly_distribution = yearly_distribution
     @monthly_distribution = yearly_distribution/12
-    @monthly_apr = apr/12
+    @monthly_apr = interest_rate/12
   end
 
   def total
@@ -184,16 +243,16 @@ end
 # has accumulated on monthly contributions at the end of the year.
 #
 class InterestEarnedOnContribution
-  def initialize(yearly_contribution, apr)
+  def initialize(yearly_contribution, interest_rate)
     @yearly_contribution = yearly_contribution
     @monthly_contribution = yearly_contribution/12.0
-    @apr = apr
+    @interest_rate = interest_rate
   end
 
   def total
     @interest_earned_from_each_contribution = {}
     (1..12).each do |x|
-      @interest_earned_from_each_contribution[x] = @monthly_contribution * @apr * ((13 - x) / 12.0)
+      @interest_earned_from_each_contribution[x] = @monthly_contribution * @interest_rate * ((13 - x) / 12.0)
     end
     @interest_earned_from_each_contribution.values.inject(:+)
   end
@@ -209,10 +268,10 @@ class Comparison
     @yearly_contribution = yearly_contribution
     @yearly_distribution = yearly_distribution
     @monthly_ss = monthly_ss
-    @apr = {}
-    @apr[:worst] = 0.04
-    @apr[:likely] = 0.06
-    @apr[:best] = 0.08
+    @interest_rate = {}
+    @interest_rate[:worst] = 0.04
+    @interest_rate[:likely] = 0.06
+    @interest_rate[:best] = 0.08
     @inflation_rate = {}
     @inflation_rate[:worst] = 0.05
     @inflation_rate[:likely] = 0.0325
@@ -230,7 +289,7 @@ class Comparison
           yearly_distribution: @yearly_distribution,
           distribution_tax_rate: 0.15,
           monthly_ss: @monthly_ss,
-          apr: @apr[situation],
+          interest_rate: @interest_rate[situation],
           inflation_rate: @inflation_rate[situation],
           age_now: 36,
           age_retire: 70,
@@ -254,7 +313,7 @@ end
 #     yearly_distribution: 74000,
 #     distribution_tax_rate: 0.15,
 #     monthly_ss: 3000,
-#     apr: 0.06,
+#     interest_rate: 0.06,
 #     inflation_rate: 0.0325,
 #     age_now: 36,
 #     age_retire: 65,
