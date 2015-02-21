@@ -175,9 +175,9 @@ class DistributionYear
       years_since_retirement: 0,
       interest_rate: 0.04,
       inflation_rate: 0.03)
-    @start_value = start_value.to_f
-    @withdrawal = withdrawal.to_f
-    @years_since_retirement = years_since_retirement.to_f
+    @start_value = start_value
+    @withdrawal = withdrawal
+    @years_since_retirement = years_since_retirement
     @interest_rate = interest_rate
     @inflation_rate = inflation_rate
   end
