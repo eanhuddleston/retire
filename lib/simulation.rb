@@ -9,78 +9,6 @@ class Float
 end
 
 ##
-# High level class for actually running one full retirement simulation, given all input parameters.
-#
-class SimulateToDeath
-  def initialize(currently_saved: 80000,
-        yearly_contribution: 15000,
-        yearly_distribution: 100000,
-        distribution_tax_rate: 0.25,
-        monthly_ss: 1000,
-        interest_rate: 0.06,
-        inflation_rate: 0.0325,
-        age_now: 25,
-        age_retire: 65,
-        age_die: 90)
-    unless age_now < age_retire and age_retire < age_die
-      raise RuntimeError.new 'Required: age_now < age_retire < age_death'
-    end
-    @currently_saved = currently_saved
-    @yearly_contribution = yearly_contribution
-    @yearly_distribution = yearly_distribution
-    @distribution_tax_rate = distribution_tax_rate
-    @monthly_ss = monthly_ss
-    @interest_rate = interest_rate
-    @inflation_rate = inflation_rate
-    @age_now = age_now
-    @age_retire = age_retire
-    @age_die = age_die
-  end
-
-  def run
-    @value_at_end_of_year = {}
-    @value_at_end_of_year[@age_now] = @currently_saved.to_f
-    year_inputs = { base_value: 0, 
-              yearly_contribution: @yearly_contribution, 
-              yearly_distribution: @yearly_distribution,
-              monthly_ss: @monthly_ss,
-              interest_rate: @interest_rate,
-              inflation_rate: @inflation_rate,
-              distribution_tax_rate: @distribution_tax_rate }
-
-    # Fill in values for accumulation years
-    year_inputs[:phase] = :contribution
-    (@age_now+1..@age_retire).each do |x|
-      year_inputs[:base_value] = @value_at_end_of_year[x-1]
-      @value_at_end_of_year[x] = Year.new(year_inputs).after_inflation
-    end
-
-    # Fill in values for distribution years
-    year_inputs[:phase] = :distribution
-    (@age_retire+1..@age_die).each do |x|
-      year_inputs[:base_value] = @value_at_end_of_year[x-1]
-      @value_at_end_of_year[x] = Year.new(year_inputs).after_inflation
-    end
-  end
-
-  def data
-    @value_at_end_of_year.map{ |k,v| [k, v.to_i] }
-  end
-
-  def data_as_hash
-    @value_at_end_of_year.map{ |k,v| { 'age' => k, 'amount' => v.to_i } }
-  end
-
-  def rounded_data
-    s1.data.map{|y, v| "#{y}:#{v.pretty}"}.join(', ')
-  end
-
-  def last
-    @value_at_end_of_year.values.last
-  end
-end
-
-##
 # High level class for running a simulation until retirement.
 #
 class SimulateToRetirement
@@ -188,16 +116,82 @@ class Year
       value_of_base_minus_distribution_plus_interest + distribution_interest
     end
   end
+end
 
-  ##
-  # Calculate the value of what's left at the end of the year after inflation.
-  # One way to think of this calculation:
-  #   if inflation rate is 10%, then current value = future value + 10%:
-  #   current value = future value * (1 + inflation rate)
-  #   so: future value = current value / (1 + inflation rate)
-  #
-  def after_inflation
-    self.before_inflation / (1 + @inflation_rate)
+class SimulateToDeath
+  def initialize(taxable_accounts: 3000000,
+      nontaxable_accounts: 1000000,
+      withdrawal_rate: 0.04,
+      interest_rate: 0.04,
+      inflation_rate: 0.03,
+      years: 30)
+    @taxable_accounts = taxable_accounts
+    @nontaxable_accounts = nontaxable_accounts
+    @withdrawal_rate = withdrawal_rate
+    @interest_rate = interest_rate
+    @inflation_rate = inflation_rate
+    @years = years
+    self.run
+  end
+
+  def run
+    @taxable_value_at_end_of_year = {}
+    @nontaxable_value_at_end_of_year = {}
+    @taxable_value_at_end_of_year[0] = @taxable_accounts.to_f
+    @nontaxable_value_at_end_of_year[0] = @nontaxable_accounts.to_f
+
+    taxable_withdrawal = @taxable_accounts * @withdrawal_rate
+    nontaxable_withdrawal = @nontaxable_accounts * @withdrawal_rate
+
+    taxable_year_inputs = { withdrawal: taxable_withdrawal,
+        interest_rate: @interest_rate,
+        inflation_rate: @inflation_rate }
+
+    nontaxable_year_inputs = { withdrawal: nontaxable_withdrawal,
+        interest_rate: @interest_rate,
+        inflation_rate: @inflation_rate }
+
+    # Fill in values for distribution years
+    (1..@years).each do |x|
+      taxable_year_inputs[:start_value] = @taxable_value_at_end_of_year[x-1]
+      taxable_year_inputs[:years_since_retirement] = x
+      @taxable_value_at_end_of_year[x] = DistributionYear.new(taxable_year_inputs).final_value
+
+      nontaxable_year_inputs[:start_value] = @nontaxable_value_at_end_of_year[x-1]
+      nontaxable_year_inputs[:years_since_retirement] = x
+      @nontaxable_value_at_end_of_year[x] = DistributionYear.new(nontaxable_year_inputs).final_value
+    end
+  end
+
+  def final_values
+    { taxable: @taxable_value_at_end_of_year.values.last, 
+        nontaxable: @nontaxable_value_at_end_of_year.values.last }
+  end
+end
+
+class DistributionYear
+  def initialize(start_value: 3000000,
+      withdrawal: 90000,
+      years_since_retirement: 0,
+      interest_rate: 0.04,
+      inflation_rate: 0.03)
+    @start_value = start_value.to_f
+    @withdrawal = withdrawal.to_f
+    @years_since_retirement = years_since_retirement.to_f
+    @interest_rate = interest_rate
+    @inflation_rate = inflation_rate
+  end
+
+  def final_value
+    adjusted_withdrawal = @withdrawal * ( 1 + @inflation_rate ) ** @years_since_retirement
+    # Take out full withdrawal for year
+    final_value = @start_value - adjusted_withdrawal
+    # Calculate interest gained on this amount 
+    final_value *= (1 + @interest_rate)
+    # Add back in interest from amounts of withdrawal left throughout
+    # year (as it's not all withdrawn at once)
+    final_value += InterestEarnedOnDistribution.new(adjusted_withdrawal, @interest_rate).total
+    final_value
   end
 end
 
