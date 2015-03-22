@@ -8,16 +8,59 @@ class Float
   end
 end
 
+class AmountToInvestToReachGoal
+  def initialize(goal: 250000,
+      years: 27)
+    @goal = goal
+    @years = years
+    self.run
+  end
+
+  def run
+    inputs = { currently_saved: 0,
+      yearly_contribution: 0,
+      interest_rate: 0.06,
+      inflation_rate: 0.03,
+      savings_increase_rate: 0,
+      years: @years }
+    low = 0
+    high = 10000000
+    mid = (high - low)/2
+    last_outcome = 0
+    while true
+      inputs[:currently_saved] = mid
+      outcome_for_mid = SimulateToRetirement.new(inputs).after_inflation
+      # puts "low: #{low}"
+      # puts "mid: #{mid}"
+      # puts "high: #{high}"
+      # puts "out_come_for_mid: #{outcome_for_mid}"
+      # puts "last_outcome: #{last_outcome}"
+      if outcome_for_mid.round(0) == last_outcome.round(0)
+        # we've honed in close enough on the desired value
+        puts "Amount needed to reach #{@goal} in #{@years} years:"
+        puts mid.round(0)
+        return
+      elsif outcome_for_mid > @goal
+        low, high = low, mid
+      elsif outcome_for_mid < @goal
+        low, high = mid, high
+      end
+      mid = low + (high - low)/2.0
+      last_outcome = outcome_for_mid
+    end
+  end
+end
+
 ##
 # High level class for running a simulation until retirement.
 #
 class SimulateToRetirement
   def initialize(currently_saved: 50000,
-        yearly_contribution: 0,
-        interest_rate: 0.06,
-        inflation_rate: 0,
-        savings_increase_rate: 0,
-        years: 30)
+      yearly_contribution: 0,
+      interest_rate: 0.06,
+      inflation_rate: 0,
+      savings_increase_rate: 0,
+      years: 30)
     @currently_saved = currently_saved
     @yearly_contribution = yearly_contribution
     @interest_rate = interest_rate
@@ -31,8 +74,7 @@ class SimulateToRetirement
     @value_at_end_of_year = {}
     @value_at_end_of_year[0] = @currently_saved.to_f
     year_inputs = { base_value: 0,
-              interest_rate: @interest_rate,
-              inflation_rate: @inflation_rate }
+              interest_rate: @interest_rate }
 
     # Fill in values for accumulation years
     year_inputs[:phase] = :contribution
@@ -40,7 +82,7 @@ class SimulateToRetirement
       year_inputs[:base_value] = @value_at_end_of_year[x-1]
       # yearly_contribution will stay constant if @savings_increase_rate == 0
       year_inputs[:yearly_contribution] = @yearly_contribution * (1 + @savings_increase_rate)**x
-      @value_at_end_of_year[x] = Year.new(year_inputs).after_inflation
+      @value_at_end_of_year[x] = Year.new(year_inputs).before_inflation
     end
   end
 
@@ -59,6 +101,10 @@ class SimulateToRetirement
   def last
     @value_at_end_of_year.values.last
   end
+
+  def after_inflation
+    @value_at_end_of_year.values.last / ( 1 + @inflation_rate ) ** @years
+  end
 end
 
 ##
@@ -66,7 +112,6 @@ end
 # the end of the year taking into account all contributions, distributions, taxes, etc.
 # Each Year object is instantiated with a 'phase', which can be either 'distribution'
 # or 'contribution', indicating whether the current year is in the contribution or
-# distribution period. It can also be set to 'none', for calculations involving changes
 # to the base_value from only inflation and/or interest earned.
 #
 class Year
@@ -75,7 +120,6 @@ class Year
         yearly_distribution: 0,
         monthly_ss: 0,
         interest_rate: 0,
-        inflation_rate: 0,
         distribution_tax_rate: 0,
         phase: :none,
         contribute_monthly: false)
@@ -84,7 +128,6 @@ class Year
     @yearly_distribution = yearly_distribution
     @monthly_ss = monthly_ss
     @interest_rate = interest_rate
-    @inflation_rate = inflation_rate
     @distribution_tax_rate = distribution_tax_rate
     @phase = phase
     @contribute_monthly = contribute_monthly
