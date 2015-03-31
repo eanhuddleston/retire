@@ -10,8 +10,8 @@ end
 
 ##
 # Code for finding a parameter value that will result in the
-# desired savings goal (in today's dollars), given that
-# all other parameter values stay constant.
+# desired savings goal (in today's dollars, i.e., adjusted
+# for inflation), given that all other parameter values stay constant.
 #
 class ParameterSearch
   def self.search(goal: 250000,
