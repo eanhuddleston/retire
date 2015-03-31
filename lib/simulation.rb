@@ -14,36 +14,45 @@ end
 # all other parameter values stay constant.
 #
 class ParameterSearch
-  def initialize(goal: 250000,
-      years: 27)
-    @goal = goal
-    @years = years
-  end
-
-  def search
-    inputs = { currently_saved: 0,
+  def self.search(goal: 250000,
+      currently_saved: 0,
       yearly_contribution: 0,
       interest_rate: 0.06,
       inflation_rate: 0.03,
       savings_increase_rate: 0,
-      years: @years }
+      years: 30)
+
+    puts "Searching using these parameters:"
+    ['currently_saved', 'yearly_contribution', 'interest_rate', 'inflation_rate',
+        'savings_increase_rate', 'years', 'goal'].each do |var|
+      puts "#{var}: #{ eval(var) }"
+    end
+
+    sim_inputs = { currently_saved: currently_saved,
+      yearly_contribution: yearly_contribution,
+      interest_rate: interest_rate,
+      inflation_rate: inflation_rate,
+      savings_increase_rate: savings_increase_rate,
+      years: years }
+  
     low = 0
     high = 10000000
     mid = (high - low)/2
     last_mid = 0
+
     while true
       # In finding the desired value, we don't care about fractions
       # of a dollar. Once we've narrowed our search down to the
       # dollar, call it good.
       if mid == last_mid
-        puts "Amount needed to reach #{@goal} in #{@years} years:"
+        puts "Amount needed to reach #{goal} in #{@years} years:"
         return mid.round(0)
       end
 
       last_mid = mid
       
-      inputs[:currently_saved] = mid
-      outcome_for_mid = SimulateToRetirement.new(inputs).after_inflation
+      sim_inputs[:currently_saved] = mid
+      outcome_for_mid = SimulateToRetirement.new(sim_inputs).after_inflation
       # puts "low: #{low}"
       # puts "mid: #{mid}"
       # puts "high: #{high}"
@@ -52,9 +61,9 @@ class ParameterSearch
       # puts ""
 
       # Adjust low and high for the next iteration
-      if outcome_for_mid > @goal
+      if outcome_for_mid > goal
         low, high = low, mid
-      elsif outcome_for_mid < @goal
+      elsif outcome_for_mid < goal
         low, high = mid, high
       end
 
