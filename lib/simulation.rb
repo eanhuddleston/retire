@@ -8,7 +8,12 @@ class Float
   end
 end
 
-class AmountToInvestToReachGoal
+##
+# Code for finding a parameter value that will result in the
+# desired savings goal (in today's dollars), given that
+# all other parameter values stay constant.
+#
+class ParameterSearch
   def initialize(goal: 250000,
       years: 27)
     @goal = goal
