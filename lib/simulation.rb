@@ -13,10 +13,9 @@ class AmountToInvestToReachGoal
       years: 27)
     @goal = goal
     @years = years
-    self.run
   end
 
-  def run
+  def search
     inputs = { currently_saved: 0,
       yearly_contribution: 0,
       interest_rate: 0.06,
@@ -26,27 +25,36 @@ class AmountToInvestToReachGoal
     low = 0
     high = 10000000
     mid = (high - low)/2
-    last_outcome = 0
+    last_mid = 0
     while true
+      # In finding the desired value, we don't care about fractions
+      # of a dollar. Once we've narrowed our search down to the
+      # dollar, call it good.
+      if mid == last_mid
+        puts "Amount needed to reach #{@goal} in #{@years} years:"
+        return mid.round(0)
+      end
+
+      last_mid = mid
+      
       inputs[:currently_saved] = mid
       outcome_for_mid = SimulateToRetirement.new(inputs).after_inflation
       # puts "low: #{low}"
       # puts "mid: #{mid}"
       # puts "high: #{high}"
       # puts "out_come_for_mid: #{outcome_for_mid}"
-      # puts "last_outcome: #{last_outcome}"
-      if outcome_for_mid.round(0) == last_outcome.round(0)
-        # we've honed in close enough on the desired value
-        puts "Amount needed to reach #{@goal} in #{@years} years:"
-        puts mid.round(0)
-        return
-      elsif outcome_for_mid > @goal
+      # puts "last_mid: #{last_mid}"
+      # puts ""
+
+      # Adjust low and high for the next iteration
+      if outcome_for_mid > @goal
         low, high = low, mid
       elsif outcome_for_mid < @goal
         low, high = mid, high
       end
+
+      # Calculate new mid for next iteration
       mid = low + (high - low)/2.0
-      last_outcome = outcome_for_mid
     end
   end
 end
