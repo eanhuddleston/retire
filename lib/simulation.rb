@@ -13,7 +13,7 @@ module Finance
       current = 0.001
       while true
         sim_inputs[search] = current
-        outcome = SimulateToRetirement.new(sim_inputs).after_inflation
+        outcome = ContributionPhase.new(sim_inputs).after_inflation
         return current if outcome >= goal
         current *= 100
       end
@@ -33,6 +33,7 @@ module Finance
       all_params = [:currently_saved, :yearly_contribution, :interest_rate, :inflation_rate,
           :savings_increase_rate, :years]
       
+      puts ''
       puts "Using these parameters:"
       (all_params - [search]).each { |var| puts "#{var}: #{ eval(var.to_s) }" }
       puts ''
@@ -54,7 +55,7 @@ module Finance
 
       while true
         sim_inputs[search] = mid
-        s = SimulateToRetirement.new(sim_inputs)
+        s = ContributionPhase.new(sim_inputs)
         outcome_for_mid = s.after_inflation
 
         if low.round(acc) == high.round(acc) or 
@@ -79,7 +80,7 @@ module Finance
   ##
   # High level class for running a simulation until retirement.
   #
-  class SimulateToRetirement
+  class ContributionPhase
     def initialize(currently_saved: 50000,
         yearly_contribution: 0,
         interest_rate: 0.06,
@@ -102,12 +103,11 @@ module Finance
                 interest_rate: @interest_rate }
 
       # Fill in values for accumulation years
-      year_inputs[:phase] = :contribution
       (1..@years).each do |x|
         year_inputs[:base_value] = @value_at_end_of_year[x-1]
         # yearly_contribution will stay constant if @savings_increase_rate == 0
         year_inputs[:yearly_contribution] = @yearly_contribution * (1 + @savings_increase_rate)**x
-        @value_at_end_of_year[x] = Year.new(year_inputs).before_inflation
+        @value_at_end_of_year[x] = Finance::contribution_year(year_inputs)
       end
     end
 
@@ -124,7 +124,7 @@ module Finance
     # end
 
     def last
-      @value_at_end_of_year.values.last
+      @value_at_end_of_year.values.last.to_i
     end
 
     def after_inflation
@@ -132,69 +132,28 @@ module Finance
     end
   end
 
-  ##
-  # Class to do all the calculations for one year to determine what amount of money is left at 
-  # the end of the year taking into account all contributions, distributions, taxes, etc.
-  # Each Year object is instantiated with a 'phase', which can be either 'distribution'
-  # or 'contribution', indicating whether the current year is in the contribution or
-  # to the base_value from only inflation and/or interest earned.
-  #
-  class Year
-    def initialize(base_value: 0,
-          yearly_contribution: 0,
-          yearly_distribution: 0,
-          monthly_ss: 0,
-          interest_rate: 0,
-          distribution_tax_rate: 0,
-          phase: :none,
-          contribute_monthly: false)
-      @base_value = base_value
-      @yearly_contribution = yearly_contribution
-      @yearly_distribution = yearly_distribution
-      @monthly_ss = monthly_ss
-      @interest_rate = interest_rate
-      @distribution_tax_rate = distribution_tax_rate
-      @phase = phase
-      @contribute_monthly = contribute_monthly
+  def self.contribution_year(base_value: 0,
+      yearly_contribution: 0,
+      interest_rate: 0,
+      contribute_monthly: false)
+    if contribute_monthly
+      contribution_interest = InterestEarnedOnContribution.new(yearly_contribution, interest_rate).total
+    else
+      contribution_interest = 0
     end
-
-    ##
-    # Returns the amount of money left at the end of the year before inflation has been considered.
-    #
-    def before_inflation
-      if @phase == :none
-        return @base_value * (1 + @interest_rate) if @interest_rate > 0  # earning interest
-        return @base_value  # not earning interest
-      elsif @phase == :contribution
-        if @contribute_monthly
-          contribution_interest = InterestEarnedOnContribution.new(@yearly_contribution, @interest_rate).total
-        else
-          contribution_interest = 0
-        end
-        @base_value * (1 + @interest_rate) + @yearly_contribution + contribution_interest
-      elsif @phase == :distribution
-        monthly_ss_after_taxes = @monthly_ss * (1 - @distribution_tax_rate)
-        yearly_ss_after_taxes = monthly_ss_after_taxes * 12
-        # Don't need to take out full amount needed, as some provided by SS
-        yearly_distribution_minus_ss_contribution = @yearly_distribution - yearly_ss_after_taxes
-        # But, of that needed after SS, need to take out enough to pay for taxes (and still have desired amount left)
-        yearly_distribution_after_tax_correction = yearly_distribution_minus_ss_contribution / (1 - @distribution_tax_rate)
-        value_of_base_minus_distribution_plus_interest = ( @base_value - yearly_distribution_after_tax_correction ) * (1 + @interest_rate)
-        distribution_interest = InterestEarnedOnDistribution.new(yearly_distribution_after_tax_correction, @interest_rate).total
-        value_of_base_minus_distribution_plus_interest + distribution_interest
-      end
-    end
+    base_value * (1 + interest_rate) + yearly_contribution + contribution_interest
   end
 
-  class SimulateToDeath
-    def initialize(taxable_accounts: 3000000,
-        nontaxable_accounts: 1000000,
+  ##
+  # Simulate the value in one account until death.
+  #
+  class DistributionPhase
+    def initialize(starting_value: 3000000,
         withdrawal_rate: 0.04,
         interest_rate: 0.04,
         inflation_rate: 0.03,
         years: 30)
-      @taxable_accounts = taxable_accounts
-      @nontaxable_accounts = nontaxable_accounts
+      @starting_value = starting_value
       @withdrawal_rate = withdrawal_rate
       @interest_rate = interest_rate
       @inflation_rate = inflation_rate
@@ -203,64 +162,41 @@ module Finance
     end
 
     def run
-      @taxable_value_at_end_of_year = {}
-      @nontaxable_value_at_end_of_year = {}
-      @taxable_value_at_end_of_year[0] = @taxable_accounts.to_f
-      @nontaxable_value_at_end_of_year[0] = @nontaxable_accounts.to_f
+      @value_at_end_of_year = {}
+      @value_at_end_of_year[0] = @starting_value.to_f
 
-      taxable_withdrawal = @taxable_accounts * @withdrawal_rate
-      nontaxable_withdrawal = @nontaxable_accounts * @withdrawal_rate
-
-      taxable_year_inputs = { withdrawal: taxable_withdrawal,
-          interest_rate: @interest_rate,
-          inflation_rate: @inflation_rate }
-
-      nontaxable_year_inputs = { withdrawal: nontaxable_withdrawal,
+      year_inputs = { withdrawal: @starting_value * @withdrawal_rate,
           interest_rate: @interest_rate,
           inflation_rate: @inflation_rate }
 
       # Fill in values for distribution years
       (1..@years).each do |x|
-        taxable_year_inputs[:start_value] = @taxable_value_at_end_of_year[x-1]
-        taxable_year_inputs[:years_since_retirement] = x
-        @taxable_value_at_end_of_year[x] = DistributionYear.new(taxable_year_inputs).final_value
-
-        nontaxable_year_inputs[:start_value] = @nontaxable_value_at_end_of_year[x-1]
-        nontaxable_year_inputs[:years_since_retirement] = x
-        @nontaxable_value_at_end_of_year[x] = DistributionYear.new(nontaxable_year_inputs).final_value
+        year_inputs[:start_value] = @value_at_end_of_year[x-1]
+        year_inputs[:years_since_retirement] = x
+        @value_at_end_of_year[x] = Finance::distribution_year(year_inputs)
       end
     end
 
-    def final_values
-      { taxable: @taxable_value_at_end_of_year.values.last, 
-          nontaxable: @nontaxable_value_at_end_of_year.values.last }
+    def final_value
+      @value_at_end_of_year.values.last.to_i
     end
   end
 
-  class DistributionYear
-    def initialize(start_value: 3000000,
-        withdrawal: 90000,
-        years_since_retirement: 0,
-        interest_rate: 0.04,
-        inflation_rate: 0.03)
-      @start_value = start_value
-      @withdrawal = withdrawal
-      @years_since_retirement = years_since_retirement
-      @interest_rate = interest_rate
-      @inflation_rate = inflation_rate
-    end
-
-    def final_value
-      adjusted_withdrawal = @withdrawal * ( 1 + @inflation_rate ) ** @years_since_retirement
-      # Take out full withdrawal for year
-      final_value = @start_value - adjusted_withdrawal
-      # Calculate interest gained on this amount 
-      final_value *= (1 + @interest_rate)
-      # Add back in interest from amounts of withdrawal left throughout
-      # year (as it's not all withdrawn at once)
-      final_value += InterestEarnedOnDistribution.new(adjusted_withdrawal, @interest_rate).total
-      final_value
-    end
+ def self.distribution_year(start_value: 3000000,
+      withdrawal: 90000,
+      years_since_retirement: 0,
+      interest_rate: 0.04,
+      inflation_rate: 0.03)
+    
+    adjusted_withdrawal = withdrawal * ( 1 + inflation_rate ) ** years_since_retirement
+    # Take out full withdrawal for year
+    final_value = start_value - adjusted_withdrawal
+    # Calculate interest gained on this amount 
+    final_value *= (1 + interest_rate)
+    # Add back in interest from amounts of withdrawal left throughout
+    # year (as it's not all withdrawn at once)
+    final_value += InterestEarnedOnDistribution.new(adjusted_withdrawal, interest_rate).total
+    final_value
   end
 
   ##
@@ -323,65 +259,6 @@ module Finance
       @interest_earned_from_each_contribution
     end
   end
-
-  class Comparison
-    def initialize(currently_saved, yearly_contribution, yearly_distribution, monthly_ss)
-      @currently_saved = currently_saved
-      @yearly_contribution = yearly_contribution
-      @yearly_distribution = yearly_distribution
-      @monthly_ss = monthly_ss
-      @interest_rate = {}
-      @interest_rate[:worst] = 0.04
-      @interest_rate[:likely] = 0.06
-      @interest_rate[:best] = 0.08
-      @inflation_rate = {}
-      @inflation_rate[:worst] = 0.05
-      @inflation_rate[:likely] = 0.0325
-      @inflation_rate[:best] = 0.02
-      @age_retire = {}
-    end
-
-    def run
-      value_at_death = {}
-
-      [:worst, :likely, :best].each do |situation|
-        simulation = Simulation.new(
-            currently_saved: @currently_saved,
-            yearly_contribution: @yearly_contribution,
-            yearly_distribution: @yearly_distribution,
-            distribution_tax_rate: 0.15,
-            monthly_ss: @monthly_ss,
-            interest_rate: @interest_rate[situation],
-            inflation_rate: @inflation_rate[situation],
-            age_now: 36,
-            age_retire: 70,
-            age_die: 92)
-
-        simulation.run
-        value_at_death[situation] = simulation.last.pretty
-      end
-
-      puts "Worst case: #{ value_at_death[:worst] }"
-      puts "Likely case: #{ value_at_death[:likely] }"
-      puts "Best case: #{ value_at_death[:best] }"
-    end
-  end
-
-  # c = Comparison.new(40000, 20000, 74000, 3000)
-  # c.run
-
-  # s1 = Simulation.new(currently_saved: 40000,
-  #     yearly_contribution: 20000,
-  #     yearly_distribution: 74000,
-  #     distribution_tax_rate: 0.15,
-  #     monthly_ss: 3000,
-  #     interest_rate: 0.06,
-  #     inflation_rate: 0.0325,
-  #     age_now: 36,
-  #     age_retire: 65,
-  #     age_die: 95)
-  # s1.run
-  # s1.data.each{|y, v| puts "#{y}: #{v}"}
 end
 
 
