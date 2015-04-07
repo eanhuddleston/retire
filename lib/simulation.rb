@@ -1,20 +1,26 @@
 module Finance
-  ##
-  # Monkeypatch to create method for converting float into nicely formatted string
-  # with dollar sign at front and commas in correct places.
-  #
-  # class Float
-  #   def pretty
-  #     '$' + self.round.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse
-  #   end
-  # end
+  def self.pretty(num)
+    '$' + num.round.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse
+  end
 
   ##
-  # Code for finding a parameter value that will result in the
-  # desired savings goal (in today's dollars, i.e., adjusted
+  # Code for finding a parameter value that will result in meeting the
+  # desired future savings goal (in today's dollars, i.e., adjusted
   # for inflation), given that all other parameter values stay constant.
   #
-  def self.parameter_search(goal: 250000,
+  class ParameterSearch
+    def self.good_high(sim_inputs: sim_inputs, search: search, goal: goal)
+      current = 0.001
+      while true
+        sim_inputs[search] = current
+        outcome = SimulateToRetirement.new(sim_inputs).after_inflation
+        return current if outcome >= goal
+        current *= 100
+      end
+    end
+
+    def self.search(search: nil,
+      goal: 250000,
       currently_saved: 0,
       yearly_contribution: 0,
       interest_rate: 0.06,
@@ -22,53 +28,51 @@ module Finance
       savings_increase_rate: 0,
       years: 30)
 
-    puts "Searching using these parameters:"
-    ['currently_saved', 'yearly_contribution', 'interest_rate', 'inflation_rate',
-        'savings_increase_rate', 'years', 'goal'].each do |var|
-      puts "#{var}: #{ eval(var) }"
-    end
+      raise ArgumentError, 'Must specify value for search' unless search
 
-    sim_inputs = { currently_saved: currently_saved,
-      yearly_contribution: yearly_contribution,
-      interest_rate: interest_rate,
-      inflation_rate: inflation_rate,
-      savings_increase_rate: savings_increase_rate,
-      years: years }
-  
-    low = 0
-    high = 10000000
-    mid = (high - low)/2
-    last_mid = 0
-
-    while true
-      # In finding the desired value, we don't care about fractions
-      # of a dollar. Once we've narrowed our search down to the
-      # dollar, call it good.
-      if mid == last_mid
-        puts "Amount needed to reach #{goal} in #{years} years:"
-        return mid.round(0)
-      end
-
-      last_mid = mid
+      all_params = [:currently_saved, :yearly_contribution, :interest_rate, :inflation_rate,
+          :savings_increase_rate, :years]
       
-      sim_inputs[:currently_saved] = mid
-      outcome_for_mid = SimulateToRetirement.new(sim_inputs).after_inflation
-      # puts "low: #{low}"
-      # puts "mid: #{mid}"
-      # puts "high: #{high}"
-      # puts "out_come_for_mid: #{outcome_for_mid}"
-      # puts "last_mid: #{last_mid}"
-      # puts ""
+      puts "Using these parameters:"
+      (all_params - [search]).each { |var| puts "#{var}: #{ eval(var.to_s) }" }
+      puts ''
 
-      # Adjust low and high for the next iteration
-      if outcome_for_mid > goal
-        low, high = low, mid
-      elsif outcome_for_mid < goal
-        low, high = mid, high
+      sim_inputs = { currently_saved: currently_saved,
+        yearly_contribution: yearly_contribution,
+        interest_rate: interest_rate,
+        inflation_rate: inflation_rate,
+        savings_increase_rate: savings_increase_rate,
+        years: years }
+    
+      # Set up initial search values
+      low = 0
+      high = good_high(sim_inputs: sim_inputs, search: search, goal: goal)
+      mid = (high - low)/2
+
+      acc = 0 if [:currently_saved, :yearly_contribution, :years].include?(search)
+      acc = 3 if [:interest_rate, :inflation_rate, :savings_increase_rate].include?(search)
+
+      while true
+        sim_inputs[search] = mid
+        s = SimulateToRetirement.new(sim_inputs)
+        outcome_for_mid = s.after_inflation
+
+        if low.round(acc) == high.round(acc) or 
+            (mid == low) or (mid == high)
+          puts "#{search} needed to reach #{ Finance::pretty(outcome_for_mid) } (for goal of #{Finance::pretty( goal )}):"
+          return mid.round(acc)
+        end
+
+        # Adjust low and high for the next iteration
+        if outcome_for_mid > goal
+          low, high = low, mid
+        elsif outcome_for_mid < goal
+          low, high = mid, high
+        end
+
+        # Calculate new mid for next iteration
+        mid = low + (high - low)/2.0
       end
-
-      # Calculate new mid for next iteration
-      mid = low + (high - low)/2.0
     end
   end
 
@@ -87,7 +91,7 @@ module Finance
       @interest_rate = interest_rate
       @inflation_rate = inflation_rate
       @savings_increase_rate = savings_increase_rate
-      @years = years
+      @years = years.round(0)
       self.run
     end
 
