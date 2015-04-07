@@ -172,7 +172,8 @@ module Finance
       # Fill in values for distribution years
       (1..@years).each do |x|
         year_inputs[:start_value] = @value_at_end_of_year[x-1]
-        year_inputs[:years_since_retirement] = x
+        # Adjust the withdrawal rate to keep pace with inflation
+        year_inputs[:withdrawal] *= ( 1 + @inflation_rate ) if x > 1
         @value_at_end_of_year[x] = Finance::distribution_year(year_inputs)
       end
     end
@@ -182,20 +183,18 @@ module Finance
     end
   end
 
- def self.distribution_year(start_value: 3000000,
-      withdrawal: 90000,
-      years_since_retirement: 0,
-      interest_rate: 0.04,
-      inflation_rate: 0.03)
-    
-    adjusted_withdrawal = withdrawal * ( 1 + inflation_rate ) ** years_since_retirement
+ def self.distribution_year(start_value: 0,
+      withdrawal: 0,
+      interest_rate: 0.0,
+      inflation_rate: 0.0)
+
     # Take out full withdrawal for year
-    final_value = start_value - adjusted_withdrawal
+    final_value = start_value - withdrawal
     # Calculate interest gained on this amount 
     final_value *= (1 + interest_rate)
     # Add back in interest from amounts of withdrawal left throughout
     # year (as it's not all withdrawn at once)
-    final_value += InterestEarnedOnDistribution.new(adjusted_withdrawal, interest_rate).total
+    final_value += InterestEarnedOnDistribution.new(withdrawal, interest_rate).total
     final_value
   end
 
