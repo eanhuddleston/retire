@@ -3,13 +3,142 @@ module Finance
     '$' + num.round.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\1,').reverse
   end
 
+  class Simulation
+    attr_accessor :taxable_at_retirement, :nontaxable_at_retirement
+
+    def initialize(taxable_current: 10000,
+        taxable_yearly_contribution: 10000,
+        taxable_savings_increase_rate: 0,
+        nontaxable_current: 10000,
+        nontaxable_yearly_contribution: 10000,
+        nontaxable_savings_increase_rate: 0,
+        interest_rate: 0.06,
+        inflation_rate: 0.03,
+        years: 30,
+        retirement_tax_rate: 0.25,
+        retirement_interest_rate: 0.04,
+        years_till_death: 30,
+        expected_yearly_pension: 20000,
+        expected_yearly_ss: 50000,
+        percent_withdrawal: 0.04 )
+      @taxable_current = taxable_current
+      @taxable_yearly_contribution = taxable_yearly_contribution
+      @taxable_savings_increase_rate = taxable_savings_increase_rate
+      @nontaxable_current = nontaxable_current
+      @nontaxable_yearly_contribution = nontaxable_yearly_contribution
+      @nontaxable_yearly_contribution = nontaxable_yearly_contribution
+      @nontaxable_savings_increase_rate = nontaxable_savings_increase_rate
+      @interest_rate = interest_rate
+      @inflation_rate = inflation_rate
+      @years = years
+      @retirement_tax_rate = retirement_tax_rate
+      @retirement_interest_rate = retirement_interest_rate
+      @years_till_death = years_till_death
+      @expected_yearly_pension = expected_yearly_pension
+      @expected_yearly_ss = expected_yearly_ss
+      @percent_withdrawal = percent_withdrawal
+
+      @values_at_retirement_summary = calculate_values_at_retirement
+      @withdrawals_summary = calculate_per_year_withdrawals
+      @values_at_death_summary = calculate_values_at_death
+    end
+
+    def summary
+      puts ''
+      puts "Values in accounts at retirement:"
+      p @values_at_retirement_summary
+      puts ''
+      puts "Withdrawal per year:"
+      p @withdrawals_summary
+      puts ''
+      puts "Values in accounts at death:"
+      p @values_at_death_summary
+      puts ''
+    end
+
+    def total
+      @withdrawals_summary.values[0..-2].inject(:+)
+    end
+
+    def calculate_values_at_retirement
+      # Taxable accounts: 401(k), Traditional IRA, etc.
+      inputs = { currently_saved: @taxable_current,
+              yearly_contribution: @taxable_yearly_contribution,
+              interest_rate: @interest_rate,
+              inflation_rate: @inflation_rate,
+              savings_increase_rate: @taxable_savings_increase_rate,
+              years: @years }
+
+      @taxable_at_retirement = Finance::ContributionPhase.new(inputs).last
+
+      # Nontaxable accounts: Roth IRA, etc.
+      inputs = { currently_saved: @nontaxable_current,
+              yearly_contribution: @nontaxable_yearly_contribution,
+              interest_rate: @interest_rate,
+              inflation_rate: @inflation_rate,
+              savings_increase_rate: @nontaxable_savings_increase_rate,
+              years: @years }
+
+      @nontaxable_at_retirement = Finance::ContributionPhase.new(inputs).last
+      
+      {taxable: @taxable_at_retirement, nontaxable: @nontaxable_at_retirement, total: @taxable_at_retirement + @nontaxable_at_retirement}
+    end
+
+    def calculate_per_year_withdrawals
+      @taxable_yearly_withdrawal = (
+        ( @taxable_at_retirement * @percent_withdrawal * (1 - @retirement_tax_rate) ) /
+        ( (1 + @inflation_rate) ** @years)
+        ).to_i
+
+      @nontaxable_yearly_withdrawal = (
+        ( @nontaxable_at_retirement * @percent_withdrawal ) /
+        ( (1 + @inflation_rate) ** @years )
+        ).to_i
+
+      # SS. Already adjusted for inflation. Only 85% of it gets taxed.
+      @ss_yearly_withdrawal = (
+        @expected_yearly_ss * 0.15 +
+        @expected_yearly_ss * 0.85 * (1 - @retirement_tax_rate)
+        ).to_i
+
+      # Chelan's Berkeley pension. Already adjusted for inflation (though
+      # may not be full adjustment...).
+      @pension_yearly_withdrawal = (
+        @expected_yearly_pension * (1 - @retirement_tax_rate)
+        ).to_i
+
+      @total_yearly_withdrawal = @taxable_yearly_withdrawal + @nontaxable_yearly_withdrawal +
+        @ss_yearly_withdrawal + @pension_yearly_withdrawal
+
+      { taxable: @taxable_yearly_withdrawal, nontaxable: @nontaxable_yearly_withdrawal,
+        ss: @ss_yearly_withdrawal, pension: @pension_yearly_withdrawal,
+        total: @total_yearly_withdrawal }
+    end
+
+    def calculate_values_at_death
+      inputs = { starting_value: @taxable_at_retirement,
+            withdrawal_rate: @percent_withdrawal,
+            interest_rate: @retirement_interest_rate,
+            years: @years_till_death }
+      @taxable_at_death = Finance::DistributionPhase.new(inputs).final_value
+
+      inputs = { starting_value: @nontaxable_at_retirement,
+            withdrawal_rate: @percent_withdrawal,
+            interest_rate: @retirement_interest_rate,
+            years: @years_till_death }
+      @nontaxable_at_death = Finance::DistributionPhase.new(inputs).final_value
+
+      { taxable: @taxable_at_death, nontaxable: @nontaxable_at_death }
+    end
+  end
+
   ##
   # Code for finding a parameter value that will result in meeting the
   # desired future savings goal (in today's dollars, i.e., adjusted
   # for inflation), given that all other parameter values stay constant.
   #
   class ParameterSearch
-    def self.good_high(sim_inputs: sim_inputs, search: search, goal: goal)
+    def self.find_good_high(sim_inputs: sim_inputs, search: search, goal: goal)
       current = 0.001
       while true
         sim_inputs[search] = current
@@ -47,7 +176,7 @@ module Finance
     
       # Set up initial search values
       low = 0
-      high = good_high(sim_inputs: sim_inputs, search: search, goal: goal)
+      high = find_good_high(sim_inputs: sim_inputs, search: search, goal: goal)
       mid = (high - low)/2
 
       acc = 0 if [:currently_saved, :yearly_contribution, :years].include?(search)
@@ -183,7 +312,7 @@ module Finance
     end
   end
 
- def self.distribution_year(start_value: 0,
+  def self.distribution_year(start_value: 0,
       withdrawal: 0,
       interest_rate: 0.0,
       inflation_rate: 0.0)
@@ -199,12 +328,15 @@ module Finance
   end
 
   ##
-  # The entire yearly distribution isn't taken out all at once, so the amount of it
-  # that's left each month still earns interest. For example, if the yearly distribution
-  # is 60k, then at the beginning of January, 5k will be taken out. But 55k of the 
-  # distribution will still earn interest for the month of Jan. This class calculates,
-  # for each month in the year, how much of the 60k is left and how much interest it
-  # earns, then returns the sum of all the interest earned (on the distribution amount).
+  # The entire yearly distribution isn't taken out all at once,
+  # so the amount of it that's left each month still earns interest. 
+  # For example, if the yearly distribution is 60k, then at the 
+  # beginning of January, 5k will be taken out. But 55k of the 
+  # distribution will still earn interest for the month of Jan. 
+  # This class calculates, for each month in the year, how much 
+  # of the 60k is left and how much interest it earns, then 
+  # returns the sum of all the interest earned (on the distribution 
+  # amount).
   #
   class InterestEarnedOnDistribution
     def initialize(yearly_distribution, interest_rate)
@@ -234,10 +366,12 @@ module Finance
   end
 
   ##
-  # With monthly contributions, and assuming contributions are made at the beginning of the month,
-  # this means that a contribution in Jan. will earn interest for the entire year, but a contribution 
-  # in Dec. will earn interest for only one month. This class determines the total interest that 
-  # has accumulated on monthly contributions at the end of the year.
+  # With monthly contributions, and assuming contributions are made at 
+  # the beginning of the month, this means that a contribution in Jan. 
+  # will earn interest for the entire year, but a contribution in Dec. 
+  # will earn interest for only one month. This class determines the 
+  # total interest that has accumulated on monthly contributions at 
+  # the end of the year.
   #
   class InterestEarnedOnContribution
     def initialize(yearly_contribution, interest_rate)
